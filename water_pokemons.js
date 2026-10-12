@@ -212,6 +212,16 @@ addIngredient("pokemon_walking_wake", { color: "#477AC0", innerColor: "#254F91",
 addIngredient("pokemon_iron_bundle", { color: "#8CCFF0", innerColor: "#4F96B8", type: "water" });
 addIngredient("pokemon_ogerpon_maschera_pozzo", { color: "#559FE0", innerColor: "#285F9C", type: "water" });
 
+addIngredient("pokemon_test_water", {
+    color: "#65B8F0",
+    type: "water"
+});
+
+addIngredient("pokemon_test_fruit", {
+    color: "#65B8F0",
+    type: "fruit"
+});
+
 console.log("water_pokemons.js caricato: Pokémon Acqua registrati.");
 
 
