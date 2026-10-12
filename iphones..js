@@ -1,9 +1,5 @@
 
-/*
- * iphones.js — Infinite Chef
- * Dimensioni a gruppi e 18 tonalità grigio-azzurre uniche.
- */
-
+// iphones.js — Infinite Chef
 // iPhone 1–6: grandi
 addIngredient("iphone_1", {
   color: "#A7B4C2",
@@ -132,3 +128,4 @@ addIngredient("iphone_18", {
   type: "fruit",
   shape: "rectangle_thinner_tablet"
 });
+
