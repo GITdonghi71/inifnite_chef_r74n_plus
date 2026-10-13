@@ -833,5 +833,3 @@ const coloreInterno = sceltaDeterministica(
     "| Forme L2 originali:", emojiL2.length
 );
 })();
-
-addRecipe("innesto_ice_cube_con_innesto_cream_con_pokemon_squirtle_liv1_liv2+milkoid+rice", "Girbobble Pleasure");
