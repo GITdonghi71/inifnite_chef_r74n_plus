@@ -1,1 +1,7 @@
-addRecipe("innesto_beer_con_cream_liv1+rice_treat+cream_smoked+raspberry+smoked_meat", "Gourmet fantasy high-ranking workers");
+
+ // Infinite Chef R74n
+ // Personal Recipes Only
+ // No addIngredient() calls
+
+ addRecipe(["innesto_beer_con_cream_liv1", "rice_treat", "sour_cream", "smoked_meat"], "Gourmet fantasy high-ranking workers");
+
