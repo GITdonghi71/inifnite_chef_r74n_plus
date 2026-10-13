@@ -224,6 +224,3 @@ addIngredient("pokemon_test_fruit", {
 
 console.log("water_pokemons.js caricato: Pokémon Acqua registrati.");
 
-addRecipe("pokemon_squirtle+kitkat", "KO joyful snack");
-
-
