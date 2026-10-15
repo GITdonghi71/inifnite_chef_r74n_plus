@@ -106,40 +106,38 @@
      * quando fanno parte della parola "innesto".
      */
     function normalizeIngredientId(value) {
-        let result = String(value || "")
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "");
+    let result = String(value || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
 
-        // Protegge i livelli prima di eliminare gli altri numeri.
-        result = result.replace(
-            /innesto[\s._-]*([12])/g,
-            function (_, level) {
-                return level === "1"
-                    ? "zzinnestolivellounozz"
-                    : "zzinnestolivelloduezz";
-            }
-        );
+    // Uniforma "innesto 1", "innesto_1" e "innesto...1".
+    result = result.replace(
+        /innesto[\s._-]*([12])/g,
+        "innesto$1"
+    );
 
-        // Punteggiatura, spazi e separatori diventano underscore.
-        result = result
-            .replace(/[^a-z0-9]+/g, "_")
-            .replace(/_+/g, "_")
-            .replace(/^_+|_+$/g, "");
+    // Uniforma i separatori della struttura innesto/con.
+    result = result.replace(
+        /innesto([12])[\s._-]*\.{0,3}[\s._-]*con[\s._-]*\.{0,3}/g,
+        "innesto$1_con_"
+    );
 
-        // Rimuove gli altri numeri dagli ID.
-        result = result.replace(/[0-9]/g, "");
+    // Trasforma spazi e punteggiatura in underscore.
+    result = result
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^_+|_+$/g, "");
 
-        // Ripristina i livelli di innesto.
-        result = result
-            .replace(/zzinnestolivellounozz/g, "innesto1")
-            .replace(/zzinnestolivelloduezz/g, "innesto2");
+    // Elimina numeri estranei, mantenendo i livelli innesto1/2.
+    result = result.replace(/innesto([12])/g, "LIVELLOINNESTO$1");
+    result = result.replace(/[0-9]/g, "");
+    result = result.replace(/LIVELLOINNESTO([12])/g, "innesto$1");
 
-        return result
-            .replace(/_+/g, "_")
-            .replace(/^_+|_+$/g, "");
-    }
-
+    return result
+        .replace(/_+/g, "_")
+        .replace(/^_+|_+$/g, "");
+}
     function combinationKey(ids) {
         return ids.slice().sort().join("+");
     }
@@ -220,13 +218,17 @@
      * Il nome della salsa è identico all'ID finale.
      */
     function createSauceId(ids) {
-        const parts = ids
-            .map(normalizeIngredientId)
-            .filter(Boolean)
-            .sort();
+    const parts = ids
+        .map(id => normalizeIngredientId(id))
+        .filter(Boolean)
+        .sort();
 
-        return "sauce_" + parts.join("_");
-    }
+    return "sauce_" + parts.join("_");
+}
+
+function createSauceName(id) {
+    return id;
+}
 
     function createSauceName(id) {
         return id;
