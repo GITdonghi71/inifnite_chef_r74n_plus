@@ -532,20 +532,21 @@
         const color = createSauceColor(sorted);
         const nutrition = combineNutrients(sorted);
 
-        const data = {
-            id,
-            name,
-            color,
-            type: "liquid",
-            shape: "blob",
-            keywords:
-                "sauce sauce_maker custom_sauce liquid salsa " +
-                sorted.join(" "),
-            sauceMaker: true,
-            sauceIngredients: sorted.slice(),
-            sauceNutrients: { ...nutrition.totals },
-            sauceNutrientSources: nutrition.sourcesFound
-        };
+      
+const data = {
+    id,
+    name,
+    color,
+    type: "liquid",
+    keywords:
+        "sauce sauce_maker custom_sauce liquid salsa " +
+        sorted.join(" "),
+    sauceMaker: true,
+    sauceIngredients: sorted.slice(),
+    sauceNutrients: { ...nutrition.totals },
+    sauceNutrientSources: nutrition.sourcesFound
+};
+
 
         if (!ingredients[id]) {
             addIngredient(id, data);
