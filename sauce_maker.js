@@ -54,32 +54,61 @@
             .slice(0, 70);
     }
 
-    function getId(placed) {
-        if (typeof placed === "string") return placed;
-        if (!placed || typeof placed !== "object") return null;
 
-        const keys = [
-            "id", "ingredientId", "ingredient_id",
-            "elementId", "element_id", "ingredient"
-        ];
+function getId(placed) {
+    if (typeof placed === "string") {
+        return ingredients[placed] ? placed : null;
+    }
 
-        for (const key of keys) {
-            const value = placed[key];
-
-            if (typeof value === "string" && ingredients[value]) {
-                return value;
-            }
-
-            if (value && typeof value === "object") {
-                if (value.id && ingredients[value.id]) return value.id;
-                if (value.name && ingredients[value.name]) {
-                    return value.name;
-                }
-            }
-        }
-
+    if (!placed || typeof placed !== "object") {
         return null;
     }
+
+    // ID diretti usati dal gioco e da smoker.js.
+    const candidates = [
+        placed.id,
+        placed.ingredientId,
+        placed.ingredient_id,
+        placed.elementId,
+        placed.element_id,
+        placed.data && placed.data.id,
+        placed.ingredient
+    ];
+
+    for (const candidate of candidates) {
+        if (
+            typeof candidate === "string" &&
+            ingredients[candidate]
+        ) {
+            return candidate;
+        }
+
+        if (
+            candidate &&
+            typeof candidate === "object" &&
+            typeof candidate.id === "string" &&
+            ingredients[candidate.id]
+        ) {
+            return candidate.id;
+        }
+    }
+
+    // Fallback: riconosce un oggetto che coincide con
+    // una definizione registrata nel database del gioco.
+    for (const [id, definition] of Object.entries(ingredients)) {
+        if (definition === placed) {
+            return id;
+        }
+    }
+
+    console.warn(
+        "[SauceMaker] Ingrediente non riconosciuto:",
+        placed
+    );
+
+    return null;
+}
+
 
     function getDefinition(id) {
         return ingredients[id] || {};
