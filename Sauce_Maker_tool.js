@@ -169,12 +169,15 @@
      * ambiguità quando si concatenano gli ID degli ingredienti.
      */
     
+
 function createSauceId(ids) {
-    const sorted = ids.slice().sort();
-    return "sauce_" + sorted
-        .map(id => cleanId(id) || "ingredient")
-        .join("_");
+    const sorted = ids
+        .map(id => cleanId(id).toLowerCase().replace(/[^a-z]/g, ""))
+        .sort();
+
+    return "sauce_" + sorted.join("_");
 }
+
 
 
     // ---------------- NOMI FANTASY + FAST FOOD ----------------
