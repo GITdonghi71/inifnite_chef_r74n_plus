@@ -4,11 +4,13 @@
  *
  * - Seleziona 4 ingredienti distinti.
  * - Crea una salsa con ID deterministico.
- * - Calcola un colore vivace basato sulla combinazione.
- * - Cerca dati nutrizionali nelle strutture disponibili.
+ * - Non assegna nomi inventati alle salse.
+ * - Usa la descrizione degli ingredienti come nome visualizzato.
+ * - Calcola un colore basato sulla combinazione.
+ * - Cerca e combina dati nutrizionali.
  * - Mantiene un database locale ricercabile.
- * - Permette di pulire la lista delle salse salvate.
- * - Conserva i metadati della salsa per altri mod.
+ * - Permette di cancellare il database.
+ * - Conserva i metadati per altri mod.
  */
 
 (function () {
@@ -58,18 +60,16 @@
     }
 
     function clearSauceDatabase() {
-        const confirmed = window.confirm(
+        if (!window.confirm(
             "Vuoi eliminare tutte le salse salvate nel database SauceMaker?"
-        );
-
-        if (!confirmed) return;
+        )) {
+            return;
+        }
 
         database = [];
         saveDatabase();
         renderDatabase();
-
         showStatus("Database delle salse svuotato.");
-        console.log("[SauceMaker] Database delle salse svuotato.");
     }
 
     // ---------------- UTILITÀ ----------------
@@ -108,6 +108,10 @@
         return def.name || id.replace(/_/g, " ");
     }
 
+    function describeIngredients(ids) {
+        return ids.map(ingredientName).join(" + ");
+    }
+
     function showStatus(message) {
         console.log("[SauceMaker]", message);
         if (status) status.textContent = message;
@@ -118,7 +122,9 @@
             return ingredients[placed] ? placed : null;
         }
 
-        if (!placed || typeof placed !== "object") return null;
+        if (!placed || typeof placed !== "object") {
+            return null;
+        }
 
         const candidates = [
             placed.id,
@@ -211,11 +217,9 @@
             return null;
         }
 
-        const keys = [
+        for (const key of [
             "color", "colour", "hex", "fill", "background"
-        ];
-
-        for (const key of keys) {
+        ]) {
             const parsed = parseColor(object[key]);
             if (parsed) return parsed;
         }
@@ -299,16 +303,7 @@
             rgb = hslToRgb(hue, Math.max(75, saturation), 49);
         }
 
-        const result = rgbToHex(rgb);
-
-        console.log(
-            "[SauceMaker] Colore:",
-            result,
-            "| combinazione:",
-            key
-        );
-
-        return result;
+        return rgbToHex(rgb);
     }
 
     // ---------------- NUTRIENTI ----------------
@@ -376,7 +371,9 @@
                 values
             );
 
-            if (Object.keys(values).length > 0) sourcesFound++;
+            if (Object.keys(values).length > 0) {
+                sourcesFound++;
+            }
 
             for (const [key, value] of Object.entries(values)) {
                 totals[key] = (totals[key] || 0) + value;
@@ -384,28 +381,6 @@
         }
 
         return { totals, sourcesFound };
-    }
-
-    // ---------------- NOMI ----------------
-
-    const adjectives = [
-        "Royal", "Mystic", "Velvet", "Infernal",
-        "Cosmic", "Golden", "Wild", "Secret",
-        "Emerald", "Crimson", "Midnight", "Atomic"
-    ];
-
-    const sauceTypes = [
-        "Nebula Sauce", "Velvet Drizzle", "Fusion Cream",
-        "Alchemy Sauce", "Flavor Elixir", "Quantum Gravy",
-        "Chef Secret", "Nutrient Nectar", "Fusion Glaze",
-        "Infinity Dressing", "Gourmet Emulsion"
-    ];
-
-    function createSauceName(ids) {
-        const h = hash(combinationKey(ids));
-
-        return adjectives[h % adjectives.length] +
-            " " + sauceTypes[(h >>> 4) % sauceTypes.length];
     }
 
     // ---------------- INTERFACCIA ----------------
@@ -431,11 +406,21 @@
 
         const query = (search.value || "").toLowerCase().trim();
 
-        const results = database.filter(item =>
-            String(item.name || "").toLowerCase().includes(query) ||
-            String(item.id || "").toLowerCase().includes(query) ||
-            (item.ingredients || []).join(" ").toLowerCase().includes(query)
-        );
+        const results = database.filter(item => {
+            const description =
+                item.description ||
+                describeIngredients(item.ingredients || []);
+
+            return (
+                String(item.name || "").toLowerCase().includes(query) ||
+                String(item.id || "").toLowerCase().includes(query) ||
+                String(description).toLowerCase().includes(query) ||
+                (item.ingredients || [])
+                    .join(" ")
+                    .toLowerCase()
+                    .includes(query)
+            );
+        });
 
         for (const item of results) {
             const row = document.createElement("div");
@@ -444,8 +429,12 @@
                 "padding:9px;margin:5px 0;background:#30243b;" +
                 "border-radius:7px;overflow-wrap:anywhere;";
 
+            const description =
+                item.description ||
+                describeIngredients(item.ingredients || []);
+
             const heading = document.createElement("strong");
-            heading.textContent = "🥣 " + item.name + " ";
+            heading.textContent = "🥣 " + description;
 
             const swatch = document.createElement("span");
             swatch.style.cssText =
@@ -455,7 +444,7 @@
                 (/^#[0-9a-f]{6}$/i.test(item.color || "")
                     ? item.color
                     : "#888") +
-                ";vertical-align:middle;";
+                ";vertical-align:middle;margin-left:6px;";
 
             heading.appendChild(swatch);
 
@@ -463,8 +452,14 @@
             details.style.cssText =
                 "font-size:12px;color:#ddd;margin-top:5px;";
 
-            details.textContent =
-                "ID: " + item.id + " | Ingredienti: " +
+            details.textContent = "ID: " + item.id;
+
+            const ingredientsDetails = document.createElement("div");
+            ingredientsDetails.style.cssText =
+                "font-size:12px;color:#ddd;margin-top:4px;";
+
+            ingredientsDetails.textContent =
+                "Ingredienti: " +
                 (item.ingredients || []).map(ingredientName).join(", ");
 
             const nutrients = document.createElement("div");
@@ -478,7 +473,13 @@
                     entries.map(([k, v]) => k + "=" + v).join(", ")
                 : "Nessun campo nutrizionale riconosciuto.";
 
-            row.append(heading, details, nutrients);
+            row.append(
+                heading,
+                details,
+                ingredientsDetails,
+                nutrients
+            );
+
             list.appendChild(row);
         }
 
@@ -514,7 +515,7 @@
 
         search = document.createElement("input");
         search.type = "search";
-        search.placeholder = "Cerca salsa o ingrediente...";
+        search.placeholder = "Cerca ID o ingrediente...";
         search.style.cssText =
             "box-sizing:border-box;width:100%;padding:9px;margin-bottom:8px;";
 
@@ -549,19 +550,30 @@
         const key = combinationKey(sorted);
         const h = hash(key);
 
-        const name = createSauceName(sorted);
-        const id = "sauce_" + cleanId(name) + "_" + h.toString(36);
+        // Descrizione degli ingredienti: nessun nome inventato.
+        const description = describeIngredients(sorted);
+
+        /*
+         * L'ID deriva dalla combinazione originale degli ingredienti.
+         * Il suffisso hash riduce il rischio di collisioni anche
+         * quando gli ID degli ingredienti sono molto lunghi.
+         */
+        const id =
+            "sauce_" + cleanId(key).slice(0, 150) +
+            "_" + h.toString(36);
+
         const color = createSauceColor(sorted);
         const nutrition = combineNutrients(sorted);
 
         const data = {
             id,
-            name,
+            name: description,
+            description,
             color,
             type: "liquid",
             keywords:
                 "sauce sauce_maker custom_sauce liquid salsa " +
-                sorted.join(" "),
+                sorted.join(" ") + " " + description,
             sauceMaker: true,
             sauceIngredients: sorted.slice(),
             sauceNutrients: { ...nutrition.totals },
@@ -580,17 +592,15 @@
 
         Object.assign(ingredients[id], data);
 
-        /*
-         * Trasforma l'oggetto cliccato in salsa.
-         * Gli ID originali sono già stati salvati in sorted.
-         */
+        // Trasforma l'oggetto cliccato in salsa.
         if (placed && typeof placed === "object") {
             Object.assign(placed, data);
         }
 
         const record = {
             id,
-            name,
+            name: description,
+            description,
             color,
             type: "liquid",
             ingredients: sorted,
@@ -611,8 +621,8 @@
         renderDatabase();
 
         showStatus(
-            "Creata " + name +
-            " | Colore: " + color +
+            "Salsa creata: " + description +
+            " | ID: " + id +
             " | Campi nutrizionali: " +
             Object.keys(nutrition.totals).length
         );
@@ -637,7 +647,10 @@
         onSelect: function () {
             createPanel();
             panel.style.display = "block";
-            showStatus("Clicca 4 ingredienti distinti, uno alla volta.");
+
+            showStatus(
+                "Clicca 4 ingredienti distinti, uno alla volta."
+            );
         },
 
         func: function (placed) {
@@ -650,7 +663,8 @@
 
             if (selected.includes(id)) {
                 showStatus(
-                    ingredientName(id) + " è già nella selezione."
+                    ingredientName(id) +
+                    " è già nella selezione."
                 );
                 return;
             }
@@ -666,7 +680,7 @@
 
             const chosen = selected.slice(0, COUNT);
 
-            // Azzera la selezione prima di trasformare l'oggetto.
+            // Azzera prima di trasformare l'oggetto.
             selected = [];
 
             try {
@@ -677,7 +691,9 @@
                     error
                 );
 
-                showStatus("Errore durante la creazione della salsa.");
+                showStatus(
+                    "Errore durante la creazione della salsa."
+                );
             }
         }
     });
@@ -722,3 +738,4 @@
         initialize();
     }
 })();
+
