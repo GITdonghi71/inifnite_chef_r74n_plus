@@ -212,10 +212,62 @@ function getId(placed) {
             sauceTypes[(h >>> 4) % sauceTypes.length];
     }
 
-    function createSauceColor(ids) {
-        const h = hash(ids.slice().sort().join("+"));
-        return "hsl(" + (h % 360) + ", 68%, 48%)";
-    }
+    
+function createSauceColor(ids) {
+    // Legge il colore originale di ogni ingrediente.
+    const colors = ids.map(id => {
+        const data = ingredients[id] || {};
+        const color = data.color || "#808080";
+
+        // Converte #RGB oppure #RRGGBB in RGB.
+        if (/^#[0-9a-f]{3}$/i.test(color)) {
+            return color.slice(1).split("").map(c =>
+                parseInt(c + c, 16)
+            );
+        }
+
+        if (/^#[0-9a-f]{6}$/i.test(color)) {
+            return [
+                parseInt(color.slice(1, 3), 16),
+                parseInt(color.slice(3, 5), 16),
+                parseInt(color.slice(5, 7), 16)
+            ];
+        }
+
+        return [128, 128, 128];
+    });
+
+    // Mescola i colori con una media RGB pesata.
+    // I pesi cambiano in base all'identità degli ingredienti.
+    let seed = 2166136261;
+
+    ids.forEach(id => {
+        for (const char of id) {
+            seed = Math.imul(seed ^ char.charCodeAt(0), 16777619);
+        }
+    });
+
+    const weights = colors.map((_, i) => {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        return 0.5 + (seed / 4294967295);
+    });
+
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+
+    const rgb = [0, 1, 2].map(channel => {
+        const value = colors.reduce(
+            (sum, color, i) => sum + color[channel] * weights[i],
+            0
+        ) / totalWeight;
+
+        return Math.round(value);
+    });
+
+    return "#" + rgb
+        .map(value => value.toString(16).padStart(2, "0"))
+        .join("");
+}
+
 
     // --------------------------------------------------
     // DATABASE RICERCABILE
