@@ -2,18 +2,24 @@
 /*
  * SauceMaker.js — Infinite Chef R74n+
  *
- * Crea salse combinando esattamente 4 ingredienti distinti.
+ * Combina esattamente 4 ingredienti distinti per creare una salsa.
+ *
+ * Funzioni:
+ * - Colore calcolato dalla combinazione dei 4 ingredienti.
+ * - Ricerca del colore in più proprietà dei dati.
+ * - Fallback cromatico deterministico se il colore manca.
+ * - Estrazione nutrizionale dinamica e diagnostica.
+ * - Database persistente e ricercabile.
+ * - Proprietà liquide applicate alla definizione e all'oggetto.
  *
  * Compatibilità prevista:
  * - addTool / addIngredient
  * - smoker.js
  * - innestatore.js
  *
- * Caratteristiche:
- * - Colore deterministico basato su tutti e 4 gli ingredienti.
- * - Proprietà liquide applicate alla definizione e all'oggetto.
- * - Database persistente e ricercabile.
- * - Estrazione dinamica dei campi nutrizionali.
+ * Nota:
+ * Le proprietà effettivamente usate per rendering e fisica
+ * dipendono dalla versione del motore di Infinite Chef.
  */
 
 (function () {
@@ -40,7 +46,7 @@
     const INGREDIENT_COUNT = 4;
 
     const NUTRIENT_RE =
-        /nutri|protein|carbohydrat|fat|fiber|vitamin|mineral|calor|energy|sugar|salt|water|lipid/i;
+        /nutri|protein|carbohydrat|fat|fiber|fibre|vitamin|mineral|calor|energy|sugar|salt|water|lipid|starch|sodium|potassium|calcium|iron/i;
 
     let selected = [];
     let sauceDatabase = [];
@@ -56,7 +62,6 @@
 
     try {
         const saved = localStorage.getItem(DB_KEY);
-
         sauceDatabase = saved ? JSON.parse(saved) : [];
 
         if (!Array.isArray(sauceDatabase)) {
@@ -83,6 +88,21 @@
             .replace(/[^a-z0-9_]+/g, "_")
             .replace(/^_+|_+$/g, "")
             .slice(0, 70);
+    }
+
+    function hash(text) {
+        let value = 2166136261;
+
+        for (let i = 0; i < text.length; i++) {
+            value ^= text.charCodeAt(i);
+            value = Math.imul(value, 16777619);
+        }
+
+        return value >>> 0;
+    }
+
+    function getCombinationKey(ids) {
+        return ids.slice().sort().join("+");
     }
 
     function getId(placed) {
@@ -122,7 +142,6 @@
             }
         }
 
-        // Riconosce anche la definizione originale.
         for (const [id, definition] of Object.entries(ingredients)) {
             if (definition === placed) {
                 return id;
@@ -143,7 +162,6 @@
 
     function getName(id) {
         const data = getDefinition(id);
-
         return data.name || id.replace(/_/g, " ");
     }
 
@@ -162,10 +180,184 @@
     }
 
     // --------------------------------------------------
+    // COLORI
+    // --------------------------------------------------
+
+    function parseColor(value) {
+        if (
+            typeof value === "number" &&
+            Number.isFinite(value)
+        ) {
+            const hex = Math.max(
+                0,
+                Math.min(0xFFFFFF, Math.round(value))
+            )
+                .toString(16)
+                .padStart(6, "0");
+
+            return [
+                parseInt(hex.slice(0, 2), 16),
+                parseInt(hex.slice(2, 4), 16),
+                parseInt(hex.slice(4, 6), 16)
+            ];
+        }
+
+        if (typeof value !== "string") {
+            return null;
+        }
+
+        const color = value.trim();
+
+        if (/^#[0-9a-f]{3}$/i.test(color)) {
+            return color.slice(1).split("").map(c =>
+                parseInt(c + c, 16)
+            );
+        }
+
+        if (/^#[0-9a-f]{6}$/i.test(color)) {
+            return [
+                parseInt(color.slice(1, 3), 16),
+                parseInt(color.slice(3, 5), 16),
+                parseInt(color.slice(5, 7), 16)
+            ];
+        }
+
+        if (/^0x[0-9a-f]{6}$/i.test(color)) {
+            return parseColor("#" + color.slice(2));
+        }
+
+        const rgb = color.match(
+            /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i
+        );
+
+        if (rgb) {
+            return [
+                Number(rgb[1]),
+                Number(rgb[2]),
+                Number(rgb[3])
+            ].map(n => Math.max(0, Math.min(255, n)));
+        }
+
+        return null;
+    }
+
+    function getIngredientColor(id) {
+        const data = getDefinition(id);
+
+        const candidates = [
+            data.color,
+            data.colorObject,
+            data.fill,
+            data.background,
+            data.hex,
+            data.colour,
+            data.style && data.style.color,
+            data.data && data.data.color,
+            data.properties && data.properties.color,
+            data.visual && data.visual.color,
+            data.render && data.render.color
+        ];
+
+        for (const candidate of candidates) {
+            const parsed = parseColor(candidate);
+
+            if (parsed) {
+                return parsed;
+            }
+        }
+
+        console.warn(
+            "[SauceMaker] Colore non trovato:",
+            id,
+            data
+        );
+
+        return null;
+    }
+
+    function createSauceColor(ids) {
+        const sortedIds = ids.slice().sort();
+
+        const fallbackColors = [
+            [235, 75, 75],
+            [70, 190, 100],
+            [70, 130, 240],
+            [245, 190, 55],
+            [185, 90, 220],
+            [40, 190, 190],
+            [240, 125, 45],
+            [220, 100, 150]
+        ];
+
+        const colors = sortedIds.map(id => {
+            const original = getIngredientColor(id);
+
+            if (original) {
+                return original;
+            }
+
+            // Il fallback varia per ingrediente e non usa
+            // sempre il grigio.
+            return fallbackColors[
+                hash(id) % fallbackColors.length
+            ];
+        });
+
+        // Seed deterministico: la combinazione mantiene
+        // lo stesso colore anche se cambia l'ordine.
+        let seed = hash(sortedIds.join("+"));
+
+        const weights = colors.map(() => {
+            seed = (
+                Math.imul(seed, 1664525) +
+                1013904223
+            ) >>> 0;
+
+            return 0.5 + seed / 4294967295;
+        });
+
+        const totalWeight = weights.reduce(
+            (sum, weight) => sum + weight,
+            0
+        );
+
+        const rgb = [0, 1, 2].map(channel => {
+            const value = colors.reduce(
+                (sum, color, index) =>
+                    sum + color[channel] * weights[index],
+                0
+            ) / totalWeight;
+
+            return Math.max(
+                0,
+                Math.min(255, Math.round(value))
+            );
+        });
+
+        const result = "#" + rgb
+            .map(value =>
+                value.toString(16).padStart(2, "0")
+            )
+            .join("");
+
+        console.log(
+            "[SauceMaker] Colore calcolato:",
+            result,
+            "Ingredienti:",
+            sortedIds
+        );
+
+        return result;
+    }
+
+    // --------------------------------------------------
     // NUTRIENTI
     // --------------------------------------------------
 
-    function extractNutrients(data, result = {}, visited = new Set()) {
+    function extractNutrients(data, result, visited) {
+        result = result || {};
+        visited = visited || new Set();
+
         if (
             !data ||
             typeof data !== "object" ||
@@ -192,10 +384,13 @@
             }
         }
 
+        // Controlla i gruppi più comuni.
         for (const groupKey of [
             "nutrients",
             "nutrition",
-            "nutrientData"
+            "nutrientData",
+            "nutritionalInfo",
+            "nutritionFacts"
         ]) {
             const group = data[groupKey];
 
@@ -212,8 +407,16 @@
         let sourcesFound = 0;
 
         ids.forEach(id => {
-            const values = extractNutrients(
-                getDefinition(id)
+            const definition = getDefinition(id);
+            const values = extractNutrients(definition);
+
+            // Diagnostica: mostra i dati reali dell'ingrediente.
+            console.log(
+                "[SauceMaker] Dati ingrediente:",
+                id,
+                definition,
+                "Nutrienti trovati:",
+                values
             );
 
             if (Object.keys(values).length > 0) {
@@ -224,6 +427,11 @@
                 totals[key] = (totals[key] || 0) + value;
             });
         });
+
+        console.log(
+            "[SauceMaker] Totali nutrizionali:",
+            totals
+        );
 
         return {
             totals,
@@ -264,149 +472,12 @@
         "Gourmet Emulsion"
     ];
 
-    function hash(text) {
-        let value = 2166136261;
-
-        for (let i = 0; i < text.length; i++) {
-            value ^= text.charCodeAt(i);
-            value = Math.imul(value, 16777619);
-        }
-
-        return value >>> 0;
-    }
-
-    function getCombinationKey(ids) {
-        return ids.slice().sort().join("+");
-    }
-
     function createSauceName(ids) {
-        const key = getCombinationKey(ids);
-        const h = hash(key);
+        const h = hash(getCombinationKey(ids));
 
-        return (
-            adjectives[h % adjectives.length] +
+        return adjectives[h % adjectives.length] +
             " " +
-            sauceTypes[
-                (h >>> 4) % sauceTypes.length
-            ]
-        );
-    }
-
-    // --------------------------------------------------
-    // COLORI
-    // --------------------------------------------------
-
-    function parseColor(color) {
-        if (typeof color !== "string") {
-            return [128, 128, 128];
-        }
-
-        if (/^#[0-9a-f]{3}$/i.test(color)) {
-            return color
-                .slice(1)
-                .split("")
-                .map(c => parseInt(c + c, 16));
-        }
-
-        if (/^#[0-9a-f]{6}$/i.test(color)) {
-            return [
-                parseInt(color.slice(1, 3), 16),
-                parseInt(color.slice(3, 5), 16),
-                parseInt(color.slice(5, 7), 16)
-            ];
-        }
-
-        return [128, 128, 128];
-    }
-
-    function createSauceColor(ids) {
-        // Ordinamento: il colore non dipende dall'ordine
-        // in cui gli ingredienti vengono selezionati.
-        const sortedIds = ids.slice().sort();
-
-        const colors = sortedIds.map(id => {
-            return parseColor(
-                getDefinition(id).color
-            );
-        });
-
-        // Seed deterministico della combinazione.
-        let seed = hash(sortedIds.join("+"));
-
-        const weights = colors.map(() => {
-            seed = (
-                Math.imul(seed, 1664525) +
-                1013904223
-            ) >>> 0;
-
-            return 0.5 + seed / 4294967295;
-        });
-
-        const totalWeight = weights.reduce(
-            (sum, weight) => sum + weight,
-            0
-        );
-
-        const rgb = [0, 1, 2].map(channel => {
-            const value = colors.reduce(
-                (sum, color, index) => {
-                    return (
-                        sum +
-                        color[channel] * weights[index]
-                    );
-                },
-                0
-            ) / totalWeight;
-
-            return Math.max(
-                0,
-                Math.min(255, Math.round(value))
-            );
-        });
-
-        return (
-            "#" +
-            rgb
-                .map(value =>
-                    value.toString(16).padStart(2, "0")
-                )
-                .join("")
-        );
-    }
-
-    // --------------------------------------------------
-    // PROPRIETÀ DELLA SALSA
-    // --------------------------------------------------
-
-    function applySauceProperties(target, data) {
-        if (!target || typeof target !== "object") {
-            return;
-        }
-
-        // Proprietà principali della definizione.
-        target.id = data.id;
-        target.name = data.name;
-        target.color = data.color;
-        target.type = "liquid";
-        target.shape = data.shape;
-
-        // Metadati aggiuntivi: il supporto dipende
-        // dalla versione del motore del gioco.
-        target.category = "liquid";
-        target.state = "liquid";
-        target.isLiquid = true;
-
-        target.keywords = data.keywords;
-        target.sauceMaker = true;
-        target.sauceIngredients =
-            data.sauceIngredients.slice();
-
-        target.sauceNutrients = {
-            ...data.sauceNutrients
-        };
-
-        target.sauceNutrientSources =
-            data.sauceNutrientSources;
+            sauceTypes[(h >>> 4) % sauceTypes.length];
     }
 
     // --------------------------------------------------
@@ -437,7 +508,7 @@
 
         list.replaceChildren();
 
-        const query = (search?.value || "")
+        const query = (search.value || "")
             .toLowerCase()
             .trim();
 
@@ -445,14 +516,14 @@
             const name = String(item.name || "").toLowerCase();
             const id = String(item.id || "").toLowerCase();
 
-            const itemIngredients = Array.isArray(item.ingredients)
-                ? item.ingredients.join(" ").toLowerCase()
-                : "";
+            const ids = Array.isArray(item.ingredients)
+                ? item.ingredients
+                : [];
 
             return (
                 name.includes(query) ||
                 id.includes(query) ||
-                itemIngredients.includes(query)
+                ids.join(" ").toLowerCase().includes(query)
             );
         });
 
@@ -467,7 +538,6 @@
                 "overflow-wrap:anywhere;";
 
             const title = document.createElement("strong");
-
             title.textContent = "🥣 " + item.name;
 
             const swatch = document.createElement("span");
@@ -495,14 +565,14 @@
                 "color:#ddd;" +
                 "margin-top:5px;";
 
-            const itemIds = Array.isArray(item.ingredients)
+            const ids = Array.isArray(item.ingredients)
                 ? item.ingredients
                 : [];
 
             details.textContent =
                 "ID: " + item.id +
                 " | Ingredienti: " +
-                itemIds.map(getName).join(", ");
+                ids.map(getName).join(", ");
 
             const nutrientLine = document.createElement("div");
 
@@ -522,20 +592,13 @@
                         .join(", ")
                 : "Nessun campo nutrizionale riconosciuto.";
 
-            row.append(
-                title,
-                details,
-                nutrientLine
-            );
-
+            row.append(title, details, nutrientLine);
             list.appendChild(row);
         });
 
         if (matches.length === 0) {
             const empty = document.createElement("div");
-
             empty.textContent = "Nessuna salsa trovata.";
-
             list.appendChild(empty);
         }
     }
@@ -565,12 +628,10 @@
             "box-shadow:0 5px 25px #0009;";
 
         const heading = document.createElement("h3");
-
         heading.textContent = "🥣 SauceMaker — Database";
         heading.style.marginTop = "0";
 
         search = document.createElement("input");
-
         search.type = "search";
         search.placeholder = "Cerca salsa o ingrediente...";
 
@@ -603,7 +664,6 @@
         );
 
         document.body.appendChild(panel);
-
         renderDB();
     }
 
@@ -624,12 +684,46 @@
     }
 
     // --------------------------------------------------
+    // APPLICAZIONE PROPRIETÀ
+    // --------------------------------------------------
+
+    function applySauceProperties(target, data) {
+        if (!target || typeof target !== "object") {
+            return;
+        }
+
+        target.id = data.id;
+        target.name = data.name;
+        target.color = data.color;
+
+        target.type = "liquid";
+        target.shape = data.shape;
+
+        // Metadati aggiuntivi: il gioco potrebbe ignorarli.
+        target.category = "liquid";
+        target.state = "liquid";
+        target.isLiquid = true;
+
+        target.keywords = data.keywords;
+        target.sauceMaker = true;
+
+        target.sauceIngredients =
+            data.sauceIngredients.slice();
+
+        target.sauceNutrients = {
+            ...data.sauceNutrients
+        };
+
+        target.sauceNutrientSources =
+            data.sauceNutrientSources;
+    }
+
+    // --------------------------------------------------
     // CREAZIONE DELLA SALSA
     // --------------------------------------------------
 
     function createSauce(ids, placed) {
         const sortedIds = ids.slice().sort();
-
         const name = createSauceName(sortedIds);
 
         const combinationHash = hash(
@@ -643,7 +737,6 @@
             combinationHash.toString(36);
 
         const color = createSauceColor(sortedIds);
-
         const nutrition = combineNutrients(sortedIds);
 
         const data = {
@@ -651,13 +744,11 @@
             name: name,
             color: color,
 
-            // Proprietà liquide principali.
+            // Proprietà principali richieste.
             type: "liquid",
-
-            // Forma prudenziale: verificare che "blob"
-            // sia supportata dalla versione del gioco.
             shape: "blob",
 
+            // Metadati aggiuntivi.
             category: "liquid",
             state: "liquid",
             isLiquid: true,
@@ -673,38 +764,34 @@
                 ...nutrition.totals
             },
 
-            sauceNutrientSources:
-                nutrition.sourcesFound
+            sauceNutrientSources: nutrition.sourcesFound
         };
 
-        // Registra o aggiorna la definizione.
+        // Registra la definizione nel gioco.
         if (!ingredients[id]) {
             addIngredient(id, data);
         }
 
-        // addIngredient potrebbe creare una propria copia
-        // della definizione: riapplica i dati al risultato.
         if (!ingredients[id]) {
             console.error(
-                "[SauceMaker] La salsa non è stata registrata:",
+                "[SauceMaker] Registrazione fallita:",
                 id
             );
 
             throw new Error(
-                "addIngredient non ha registrato la salsa."
+                "Il gioco non ha registrato la salsa."
             );
         }
 
+        // Riapplica le proprietà dopo la registrazione.
         Object.assign(ingredients[id], data);
 
-        // Il quarto elemento diventa la salsa.
-        // L'ID e il colore derivano dalla combinazione,
-        // non dall'ultimo ingrediente.
+        // Aggiorna l'oggetto fisico ricevuto dal tool.
         if (placed && typeof placed === "object") {
             applySauceProperties(placed, data);
         }
 
-        // Aggiorna il database locale.
+        // Registra anche il colore nel database.
         const record = {
             id: id,
             name: name,
@@ -734,20 +821,22 @@
 
         showStatus(
             "Creata " + name +
-            " | Liquida | Colore: " + color +
-            " | Ingredienti: " +
-            sortedIds.map(getName).join(", ") +
+            " | Tipo: liquid" +
+            " | Colore: " + color +
             " | Campi nutrizionali: " +
             Object.keys(nutrition.totals).length
         );
 
-        console.log("[SauceMaker] Nuova salsa:", record);
+        console.log(
+            "[SauceMaker] Salsa creata:",
+            record
+        );
 
         return record;
     }
 
     // --------------------------------------------------
-    // TOOL: QUATTRO INGREDIENTI
+    // TOOL
     // --------------------------------------------------
 
     addTool("saucemaker", {
@@ -758,7 +847,6 @@
 
         onSelect: function () {
             createPanel();
-
             panel.style.display = "block";
 
             showStatus(
@@ -860,7 +948,7 @@
 
         console.log(
             "[SauceMaker] Caricato. " +
-            "Usa il tool e seleziona 4 ingredienti."
+            "Seleziona 4 ingredienti per creare una salsa."
         );
     }
 
@@ -874,4 +962,5 @@
         initialize();
     }
 })();
+
 
