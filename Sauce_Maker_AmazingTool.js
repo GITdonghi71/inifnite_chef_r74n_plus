@@ -4,8 +4,9 @@
  *
  * - Seleziona 4 ingredienti distinti.
  * - ID deterministico basato sugli ID degli ingredienti.
- * - Nomi fantasy + fast-food, coerenti con la combinazione.
- * - Nessun codice numerico nel nome visualizzato.
+ * - Nome della salsa identico al suo ID.
+ * - Livelli di innesto 1 e 2 conservati.
+ * - Parole separate da underscore.
  * - Colore deterministico.
  * - Estrazione e combinazione dei dati nutrizionali.
  * - Database locale ricercabile e cancellabile.
@@ -88,8 +89,55 @@
             .normalize("NFD")
             .replace(/[\u0300-\u036f]/g, "")
             .replace(/[^a-z0-9_]+/g, "_")
+            .replace(/_+/g, "_")
             .replace(/^_+|_+$/g, "")
             .slice(0, 65);
+    }
+
+    /*
+     * Normalizza l'ID di un ingrediente.
+     *
+     * Esempi:
+     * "Crab Sticks"            -> "crab_sticks"
+     * "innesto1...con...Olive" -> "innesto1_con_olive"
+     * "innesto2...con...Milk"  -> "innesto2_con_milk"
+     *
+     * I livelli 1 e 2 sono conservati esclusivamente
+     * quando fanno parte della parola "innesto".
+     */
+    function normalizeIngredientId(value) {
+        let result = String(value || "")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+
+        // Protegge i livelli prima di eliminare gli altri numeri.
+        result = result.replace(
+            /innesto[\s._-]*([12])/g,
+            function (_, level) {
+                return level === "1"
+                    ? "zzinnestolivellounozz"
+                    : "zzinnestolivelloduezz";
+            }
+        );
+
+        // Punteggiatura, spazi e separatori diventano underscore.
+        result = result
+            .replace(/[^a-z0-9]+/g, "_")
+            .replace(/_+/g, "_")
+            .replace(/^_+|_+$/g, "");
+
+        // Rimuove gli altri numeri dagli ID.
+        result = result.replace(/[0-9]/g, "");
+
+        // Ripristina i livelli di innesto.
+        result = result
+            .replace(/zzinnestolivellounozz/g, "innesto1")
+            .replace(/zzinnestolivelloduezz/g, "innesto2");
+
+        return result
+            .replace(/_+/g, "_")
+            .replace(/^_+|_+$/g, "");
     }
 
     function combinationKey(ids) {
@@ -162,277 +210,26 @@
         return null;
     }
 
-    // ---------------- ID ----------------
+    // ---------------- ID E NOME ----------------
 
     /*
-     * Ogni ID è codificato con la propria lunghezza per evitare
-     * ambiguità quando si concatenano gli ID degli ingredienti.
+     * Ogni ingrediente contribuisce con il proprio ID.
+     * Le parole sono separate da underscore.
+     * Gli ID sono ordinati per ottenere un risultato deterministico.
+     *
+     * Il nome della salsa è identico all'ID finale.
      */
-    
+    function createSauceId(ids) {
+        const parts = ids
+            .map(normalizeIngredientId)
+            .filter(Boolean)
+            .sort();
 
-
-function createSauceId(ids) {
-    const parts = ids.map(id => {
-        let value = cleanId(id).toLowerCase();
-
-        // Preserva il livello di innesto.
-        value = value.replace(/innesto\s*([12])/g, "innesto$1");
-
-        // Normalizza la struttura "innesto...con...".
-        value = value.replace(/innesto([12])\s*\.{2,}\s*con\s*\.{2,}/g,
-            "innesto$1_con_");
-
-        // Tutti i separatori diventano underscore.
-        value = value
-            .replace(/[^a-z0-9]+/g, "_")
-            .replace(/_+/g, "_")
-            .replace(/^_+|_+$/g, "");
-
-        return value;
-    });
-
-    return "sauce_" + parts.sort().join("_");
-}
-
-
-
-
-    // ---------------- NOMI FANTASY + FAST FOOD ----------------
-
-    /*
-     * I profili servono a riconoscere i temi degli ingredienti.
-     * Il nome è sempre deterministico per la stessa combinazione.
-     */
-    const ingredientProfiles = [
-        {
-            keys: [
-                "crab", "crab_stick", "surimi", "shrimp", "prawn",
-                "lobster", "fish", "salmon", "tuna", "seafood",
-                "gambero", "granchio", "pesce", "salmone", "tonno"
-            ],
-            theme: "Kraken",
-            weight: 5
-        },
-        {
-            keys: [
-                "dragon", "drago", "chili", "chilli", "pepper",
-                "peperoncino", "jalapeno", "hot_sauce", "fire"
-            ],
-            theme: "Drago",
-            weight: 5
-        },
-        {
-            keys: [
-                "mushroom", "truffle", "fungus", "fungo",
-                "tartufo", "porcini"
-            ],
-            theme: "Basilisco",
-            weight: 4
-        },
-        {
-            keys: [
-                "chocolate", "cocoa", "caramel", "honey",
-                "vanilla", "cioccolato", "cacao", "caramello",
-                "miele", "vaniglia"
-            ],
-            theme: "Fenice",
-            weight: 4
-        },
-        {
-            keys: [
-                "beef", "pork", "chicken", "bacon", "ham",
-                "sausage", "meat", "manzo", "maiale", "pollo",
-                "prosciutto", "salsiccia", "carne"
-            ],
-            theme: "Titano",
-            weight: 4
-        },
-        {
-            keys: [
-                "pistachio", "pistacchio", "olive", "oliva",
-                "basil", "basilico", "avocado", "spinach",
-                "pesto", "lettuce"
-            ],
-            theme: "Grifone",
-            weight: 3
-        },
-        {
-            keys: [
-                "apple", "pear", "peach", "mango", "banana",
-                "strawberry", "berry", "cherry", "grape",
-                "pineapple", "orange", "lemon", "lime",
-                "mela", "pera", "pesca", "fragola", "ciliegia",
-                "uva", "ananas", "arancia", "limone"
-            ],
-            theme: "Unicorno",
-            weight: 3
-        },
-        {
-            keys: [
-                "milk", "cream", "cheese", "butter", "yogurt",
-                "latte", "panna", "formaggio", "burro"
-            ],
-            theme: "Golem",
-            weight: 2
-        }
-    ];
-
-    const titleVariants = [
-        "Suprema",
-        "Mega",
-        "Deluxe",
-        "Mitica",
-        "Leggendaria",
-        "Ultra",
-        "Royal",
-        "Fantastica"
-    ];
-
-    const epithetProfiles = [
-        {
-            keys: [
-                "pistachio", "pistacchio", "olive", "oliva",
-                "basil", "basilico", "avocado", "spinach", "pesto"
-            ],
-            label: "Verde"
-        },
-        {
-            keys: [
-                "smoked", "smoke", "bacon", "barbecue", "bbq",
-                "affumicato", "affumicata"
-            ],
-            label: "Affumicata"
-        },
-        {
-            keys: [
-                "chili", "chilli", "pepper", "hot", "jalapeno",
-                "peperoncino", "piccante"
-            ],
-            label: "Infernale"
-        },
-        {
-            keys: [
-                "cheese", "butter", "cream", "milk",
-                "formaggio", "burro", "panna", "latte"
-            ],
-            label: "Dorata"
-        },
-        {
-            keys: [
-                "lemon", "lime", "orange", "pineapple",
-                "limone", "arancia", "ananas"
-            ],
-            label: "Solare"
-        },
-        {
-            keys: [
-                "chocolate", "cocoa", "caramel", "honey",
-                "cioccolato", "cacao", "caramello", "miele"
-            ],
-            label: "Magica"
-        },
-        {
-            keys: [
-                "crab", "shrimp", "prawn", "lobster", "fish",
-                "seafood", "granchio", "gambero", "pesce"
-            ],
-            label: "Marina"
-        }
-    ];
-
-    function ingredientSearchText(ids) {
-        return ids.map(id =>
-            normalizedText(id + " " + ingredientName(id))
-        ).join(" ");
+        return "sauce_" + parts.join("_");
     }
 
-    function containsAny(text, keys) {
-        return keys.some(key => {
-            const normalizedKey = normalizedText(key);
-            return normalizedKey &&
-                (" " + text + " ").includes(" " + normalizedKey + " ");
-        });
-    }
-
-    function getTheme(ids) {
-        const text = ingredientSearchText(ids);
-        let best = null;
-        let bestScore = 0;
-
-        for (const profile of ingredientProfiles) {
-            let score = 0;
-
-            for (const key of profile.keys) {
-                if (containsAny(text, [key])) score += profile.weight;
-            }
-
-            if (score > bestScore) {
-                best = profile;
-                bestScore = score;
-            }
-        }
-
-        return best ? best.theme : "Grifone";
-    }
-
-    function getEpithet(ids) {
-        const text = ingredientSearchText(ids);
-
-        for (const profile of epithetProfiles) {
-            if (containsAny(text, profile.keys)) {
-                return profile.label;
-            }
-        }
-
-        return "Leggendaria";
-    }
-
-    function createSauceName(ids) {
-        const sorted = ids.slice().sort();
-        const text = ingredientSearchText(sorted);
-        const theme = getTheme(sorted);
-        const epithet = getEpithet(sorted);
-
-        const seed = hash(combinationKey(sorted));
-        const title = titleVariants[seed % titleVariants.length];
-
-        /*
-         * Nomi speciali per alcune combinazioni riconoscibili.
-         * Le regole controllano tutti gli ingredienti della salsa.
-         */
-        const hasSeafood = containsAny(text, [
-            "crab", "crab_stick", "surimi", "shrimp", "prawn",
-            "lobster", "fish", "seafood", "granchio", "gambero", "pesce"
-        ]);
-
-        const hasGreen = containsAny(text, [
-            "pistachio", "pistacchio", "olive", "oliva",
-            "basil", "basilico", "avocado", "pesto"
-        ]);
-
-        const hasDairy = containsAny(text, [
-            "butter", "burro", "cream", "panna", "cheese",
-            "formaggio", "milk", "latte"
-        ]);
-
-        const hasHot = containsAny(text, [
-            "chili", "chilli", "pepper", "jalapeno",
-            "peperoncino", "hot_sauce"
-        ]);
-
-        if (hasSeafood && hasGreen && hasDairy) {
-            return title + " del Kraken Verde";
-        }
-
-        if (hasHot && hasDairy) {
-            return title + " del Drago Cremisi";
-        }
-
-        if (hasGreen && hasDairy) {
-            return title + " del Drago Verde";
-        }
-
-        return title + " " + theme + " " + epithet;
+    function createSauceName(id) {
+        return id;
     }
 
     // ---------------- COLORI ----------------
@@ -668,7 +465,6 @@ function createSauceId(ids) {
                 describeIngredients(item.ingredients || []);
 
             return (
-                String(item.name || "").toLowerCase().includes(query) ||
                 String(item.id || "").toLowerCase().includes(query) ||
                 String(description).toLowerCase().includes(query) ||
                 (item.ingredients || [])
@@ -687,9 +483,9 @@ function createSauceId(ids) {
                 "border-radius:7px;overflow-wrap:anywhere;";
 
             const heading = document.createElement("strong");
-            heading.textContent =
-                "🥣 " + (item.name ||
-                    createSauceName(item.ingredients || []));
+
+            // Nome visualizzato sempre identico all'ID.
+            heading.textContent = "🥣 " + item.id;
 
             const swatch = document.createElement("span");
             swatch.style.cssText =
@@ -761,7 +557,7 @@ function createSauceId(ids) {
 
         search = document.createElement("input");
         search.type = "search";
-        search.placeholder = "Cerca nome, ID o ingrediente...";
+        search.placeholder = "Cerca ID o ingrediente...";
         search.style.cssText =
             "box-sizing:border-box;width:100%;padding:9px;margin-bottom:8px;";
 
@@ -794,7 +590,7 @@ function createSauceId(ids) {
         const sorted = ids.slice().sort();
 
         const id = createSauceId(sorted);
-        const name = createSauceName(sorted);
+        const name = createSauceName(id);
         const description = describeIngredients(sorted);
         const color = createSauceColor(sorted);
         const nutrition = combineNutrients(sorted);
@@ -807,7 +603,7 @@ function createSauceId(ids) {
             type: "liquid",
             keywords:
                 "sauce sauce_maker custom_sauce liquid salsa " +
-                sorted.join(" ") + " " + name + " " + description,
+                sorted.join(" ") + " " + id + " " + description,
             sauceMaker: true,
             sauceIngredients: sorted.slice(),
             sauceNutrients: { ...nutrition.totals },
@@ -822,13 +618,16 @@ function createSauceId(ids) {
 
         Object.assign(ingredients[id], data);
 
+        // Nome sempre uguale all'ID anche nell'oggetto del gioco.
+        ingredients[id].name = id;
+
         if (placed && typeof placed === "object") {
             Object.assign(placed, data);
         }
 
         const record = {
             id,
-            name,
+            name: id,
             description,
             color,
             type: "liquid",
@@ -847,8 +646,7 @@ function createSauceId(ids) {
         renderDatabase();
 
         showStatus(
-            "Creata: " + name +
-            " | ID: " + id +
+            "Creata: " + id +
             " | Campi nutrizionali: " +
             Object.keys(nutrition.totals).length
         );
