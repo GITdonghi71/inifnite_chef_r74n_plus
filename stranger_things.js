@@ -102,3 +102,148 @@ addIngredient("hawkins_fire", {
     type: "fruit",
     shape: "flame"
 });
+
+// Personaggi di Hawkins
+addIngredient("mike_wheeler", {
+    color: "#5377A8",
+    innerColor: "#B8D0ED",
+    type: "fruit",
+    shape: "person"
+});
+
+addIngredient("dustin_henderson", {
+    color: "#C78B45",
+    innerColor: "#F1D1A0",
+    type: "fruit",
+    shape: "person"
+});
+
+addIngredient("lucas_sinclair", {
+    color: "#477D56",
+    innerColor: "#B6D9B1",
+    type: "fruit",
+    shape: "person"
+});
+
+addIngredient("will_byers", {
+    color: "#6384A0",
+    innerColor: "#C3D6E5",
+    type: "fruit",
+    shape: "person"
+});
+
+addIngredient("max_mayfield", {
+    color: "#B94F49",
+    innerColor: "#F0B0A6",
+    type: "fruit",
+    shape: "person"
+});
+
+addIngredient("jim_hopper", {
+    color: "#53634B",
+    innerColor: "#B8C4A5",
+    type: "fruit",
+    shape: "person"
+});
+
+addIngredient("joyce_byers", {
+    color: "#A85D47",
+    innerColor: "#E8B7A0",
+    type: "fruit",
+    shape: "person"
+});
+
+addIngredient("steve_harrington", {
+    color: "#8B6849",
+    innerColor: "#D9B995",
+    type: "fruit",
+    shape: "person"
+});
+
+addIngredient("nancy_wheeler", {
+    color: "#6D5A91",
+    innerColor: "#C8B8E3",
+    type: "fruit",
+    shape: "person"
+});
+
+addIngredient("robin_buckley", {
+    color: "#438B87",
+    innerColor: "#A8DCD2",
+    type: "fruit",
+    shape: "person"
+});
+
+addIngredient("eddie_munson", {
+    color: "#4C4C59",
+    innerColor: "#B9B7C8",
+    type: "fruit",
+    shape: "skull"
+});
+
+// Creature del Sottosopra
+addIngredient("demodog", {
+    color: "#743A43",
+    innerColor: "#D18486",
+    type: "fruit",
+    shape: "fungus_pointy"
+});
+
+addIngredient("demobat", {
+    color: "#382C49",
+    innerColor: "#9076A8",
+    type: "fruit",
+    shape: "bat"
+});
+
+addIngredient("vine_tendril", {
+    color: "#354D35",
+    innerColor: "#79945D",
+    type: "fruit",
+    shape: "vine"
+});
+
+addIngredient("vecna_clock", {
+    color: "#76563D",
+    innerColor: "#D2B184",
+    type: "fruit",
+    shape: "clock"
+});
+
+// Luoghi iconici
+addIngredient("hawkins_lab", {
+    color: "#8C969C",
+    innerColor: "#D8E0E2",
+    type: "fruit",
+    shape: "building"
+});
+
+addIngredient("creel_house", {
+    color: "#55443C",
+    innerColor: "#B99B7C",
+    type: "fruit",
+    shape: "house"
+});
+
+addIngredient("starcourt_mall", {
+    color: "#D07891",
+    innerColor: "#F4C4D1",
+    type: "fruit",
+    shape: "building"
+});
+
+// Oggetti e simboli
+addIngredient("walkie_talkie", {
+    color: "#53664C",
+    innerColor: "#B6C69B",
+    type: "fruit",
+    shape: "radio"
+});
+
+addIngredient("hellfire_club", {
+    color: "#A32F35",
+    innerColor: "#E9A04F",
+    type: "fruit",
+    shape: "skull"
+});
+
