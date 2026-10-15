@@ -172,16 +172,12 @@
      * La lunghezza davanti a ciascun ID rende non ambiguo
      * il contenuto della combinazione.
      */
-    function createSauceId(ids) {
-        const sorted = ids.slice().sort();
+    
+function createSauceId(ids) {
+    const sorted = ids.slice().sort();
+    return "sauce_" + sorted.map(cleanId).join("_");
+}
 
-        const encoded = sorted.map(id => {
-            const value = cleanId(id) || "ingredient";
-            return value.length + "_" + value;
-        });
-
-        return "sauce_" + encoded.join("_");
-    }
 
     /*
      * Generazione del nome breve.
