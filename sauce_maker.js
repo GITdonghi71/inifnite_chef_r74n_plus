@@ -1,42 +1,73 @@
 
 /*
  * SauceMaker.js — Infinite Chef R74n+
- * Crea salse combinando esattamente 4 ingredienti.
  *
- * Compatibilità:
+ * Crea salse combinando esattamente 4 ingredienti distinti.
+ *
+ * Compatibilità prevista:
  * - addTool / addIngredient
- * - smoker.js: le salse possono essere affumicate
- * - innestatore.js: le salse possono essere innestate
+ * - smoker.js
+ * - innestatore.js
  *
- * Nota: l'estrazione nutrizionale è dinamica e dipende
- * dai campi realmente presenti nei dati degli ingredienti.
+ * Caratteristiche:
+ * - Colore deterministico basato su tutti e 4 gli ingredienti.
+ * - Proprietà liquide applicate alla definizione e all'oggetto.
+ * - Database persistente e ricercabile.
+ * - Estrazione dinamica dei campi nutrizionali.
  */
 
 (function () {
     "use strict";
 
+    // --------------------------------------------------
+    // VERIFICA API
+    // --------------------------------------------------
+
     if (
         typeof addTool !== "function" ||
         typeof addIngredient !== "function" ||
-        typeof ingredients !== "object"
+        typeof ingredients !== "object" ||
+        ingredients === null
     ) {
-        console.error("[SauceMaker] API del gioco non disponibili.");
+        console.error(
+            "[SauceMaker] API del gioco non disponibili."
+        );
         return;
     }
 
     const PREFIX = "saucemaker";
     const DB_KEY = "infinite_chef_saucemaker_db_v1";
+    const INGREDIENT_COUNT = 4;
+
     const NUTRIENT_RE =
         /nutri|protein|carbohydrat|fat|fiber|vitamin|mineral|calor|energy|sugar|salt|water|lipid/i;
 
     let selected = [];
     let sauceDatabase = [];
 
+    let panel = null;
+    let list = null;
+    let search = null;
+    let status = null;
+
+    // --------------------------------------------------
+    // CARICAMENTO DATABASE
+    // --------------------------------------------------
+
     try {
         const saved = localStorage.getItem(DB_KEY);
+
         sauceDatabase = saved ? JSON.parse(saved) : [];
-        if (!Array.isArray(sauceDatabase)) sauceDatabase = [];
-    } catch (_) {
+
+        if (!Array.isArray(sauceDatabase)) {
+            sauceDatabase = [];
+        }
+    } catch (error) {
+        console.warn(
+            "[SauceMaker] Impossibile caricare il database.",
+            error
+        );
+
         sauceDatabase = [];
     }
 
@@ -54,61 +85,57 @@
             .slice(0, 70);
     }
 
+    function getId(placed) {
+        if (typeof placed === "string") {
+            return ingredients[placed] ? placed : null;
+        }
 
-function getId(placed) {
-    if (typeof placed === "string") {
-        return ingredients[placed] ? placed : null;
-    }
+        if (!placed || typeof placed !== "object") {
+            return null;
+        }
 
-    if (!placed || typeof placed !== "object") {
+        const candidates = [
+            placed.id,
+            placed.ingredientId,
+            placed.ingredient_id,
+            placed.elementId,
+            placed.element_id,
+            placed.data && placed.data.id,
+            placed.ingredient
+        ];
+
+        for (const candidate of candidates) {
+            if (
+                typeof candidate === "string" &&
+                ingredients[candidate]
+            ) {
+                return candidate;
+            }
+
+            if (
+                candidate &&
+                typeof candidate === "object" &&
+                typeof candidate.id === "string" &&
+                ingredients[candidate.id]
+            ) {
+                return candidate.id;
+            }
+        }
+
+        // Riconosce anche la definizione originale.
+        for (const [id, definition] of Object.entries(ingredients)) {
+            if (definition === placed) {
+                return id;
+            }
+        }
+
+        console.warn(
+            "[SauceMaker] Ingrediente non riconosciuto:",
+            placed
+        );
+
         return null;
     }
-
-    // ID diretti usati dal gioco e da smoker.js.
-    const candidates = [
-        placed.id,
-        placed.ingredientId,
-        placed.ingredient_id,
-        placed.elementId,
-        placed.element_id,
-        placed.data && placed.data.id,
-        placed.ingredient
-    ];
-
-    for (const candidate of candidates) {
-        if (
-            typeof candidate === "string" &&
-            ingredients[candidate]
-        ) {
-            return candidate;
-        }
-
-        if (
-            candidate &&
-            typeof candidate === "object" &&
-            typeof candidate.id === "string" &&
-            ingredients[candidate.id]
-        ) {
-            return candidate.id;
-        }
-    }
-
-    // Fallback: riconosce un oggetto che coincide con
-    // una definizione registrata nel database del gioco.
-    for (const [id, definition] of Object.entries(ingredients)) {
-        if (definition === placed) {
-            return id;
-        }
-    }
-
-    console.warn(
-        "[SauceMaker] Ingrediente non riconosciuto:",
-        placed
-    );
-
-    return null;
-}
-
 
     function getDefinition(id) {
         return ingredients[id] || {};
@@ -116,40 +143,64 @@ function getId(placed) {
 
     function getName(id) {
         const data = getDefinition(id);
+
         return data.name || id.replace(/_/g, " ");
     }
 
     function saveDB() {
         try {
-            localStorage.setItem(DB_KEY, JSON.stringify(sauceDatabase));
+            localStorage.setItem(
+                DB_KEY,
+                JSON.stringify(sauceDatabase)
+            );
         } catch (error) {
-            console.warn("[SauceMaker] Database non salvato.", error);
+            console.warn(
+                "[SauceMaker] Database non salvato.",
+                error
+            );
         }
     }
 
-    // Estrae i campi nutrizionali riconoscibili.
-    function extractNutrients(data) {
-        const result = {};
+    // --------------------------------------------------
+    // NUTRIENTI
+    // --------------------------------------------------
 
-        if (!data || typeof data !== "object") return result;
+    function extractNutrients(data, result = {}, visited = new Set()) {
+        if (
+            !data ||
+            typeof data !== "object" ||
+            visited.has(data)
+        ) {
+            return result;
+        }
+
+        visited.add(data);
 
         for (const [key, value] of Object.entries(data)) {
             if (
                 NUTRIENT_RE.test(key) &&
-                (typeof value === "number" ||
-                 (typeof value === "string" && value.trim() !== "" &&
-                  Number.isFinite(Number(value))))
+                (
+                    typeof value === "number" ||
+                    (
+                        typeof value === "string" &&
+                        value.trim() !== "" &&
+                        Number.isFinite(Number(value))
+                    )
+                )
             ) {
                 result[key] = Number(value);
             }
         }
 
-        // Alcuni mod potrebbero raggruppare i nutrienti.
-        for (const groupKey of ["nutrients", "nutrition", "nutrientData"]) {
+        for (const groupKey of [
+            "nutrients",
+            "nutrition",
+            "nutrientData"
+        ]) {
             const group = data[groupKey];
 
             if (group && typeof group === "object") {
-                Object.assign(result, extractNutrients(group));
+                extractNutrients(group, result, visited);
             }
         }
 
@@ -161,9 +212,13 @@ function getId(placed) {
         let sourcesFound = 0;
 
         ids.forEach(id => {
-            const values = extractNutrients(getDefinition(id));
+            const values = extractNutrients(
+                getDefinition(id)
+            );
 
-            if (Object.keys(values).length) sourcesFound++;
+            if (Object.keys(values).length > 0) {
+                sourcesFound++;
+            }
 
             Object.entries(values).forEach(([key, value]) => {
                 totals[key] = (totals[key] || 0) + value;
@@ -177,20 +232,36 @@ function getId(placed) {
     }
 
     // --------------------------------------------------
-    // NOMI E COLORI DELLE SALSE
+    // NOMI DELLE SALSE
     // --------------------------------------------------
 
     const adjectives = [
-        "Royal", "Mystic", "Velvet", "Infernal",
-        "Cosmic", "Golden", "Wild", "Secret",
-        "Emerald", "Crimson", "Midnight", "Atomic"
+        "Royal",
+        "Mystic",
+        "Velvet",
+        "Infernal",
+        "Cosmic",
+        "Golden",
+        "Wild",
+        "Secret",
+        "Emerald",
+        "Crimson",
+        "Midnight",
+        "Atomic"
     ];
 
     const sauceTypes = [
-        "Nebula Sauce", "Velvet Drizzle", "Fusion Cream",
-        "Alchemy Sauce", "Flavor Elixir", "Quantum Gravy",
-        "Chef's Secret", "Nutrient Nectar", "Fusion Glaze",
-        "Infinity Dressing", "Gourmet Emulsion"
+        "Nebula Sauce",
+        "Velvet Drizzle",
+        "Fusion Cream",
+        "Alchemy Sauce",
+        "Flavor Elixir",
+        "Quantum Gravy",
+        "Chef's Secret",
+        "Nutrient Nectar",
+        "Fusion Glaze",
+        "Infinity Dressing",
+        "Gourmet Emulsion"
     ];
 
     function hash(text) {
@@ -204,26 +275,37 @@ function getId(placed) {
         return value >>> 0;
     }
 
-    function createSauceName(ids) {
-        const key = ids.slice().sort().join("+");
-        const h = hash(key);
-
-        return adjectives[h % adjectives.length] + " " +
-            sauceTypes[(h >>> 4) % sauceTypes.length];
+    function getCombinationKey(ids) {
+        return ids.slice().sort().join("+");
     }
 
-    
-function createSauceColor(ids) {
-    // Legge il colore originale di ogni ingrediente.
-    const colors = ids.map(id => {
-        const data = ingredients[id] || {};
-        const color = data.color || "#808080";
+    function createSauceName(ids) {
+        const key = getCombinationKey(ids);
+        const h = hash(key);
 
-        // Converte #RGB oppure #RRGGBB in RGB.
+        return (
+            adjectives[h % adjectives.length] +
+            " " +
+            sauceTypes[
+                (h >>> 4) % sauceTypes.length
+            ]
+        );
+    }
+
+    // --------------------------------------------------
+    // COLORI
+    // --------------------------------------------------
+
+    function parseColor(color) {
+        if (typeof color !== "string") {
+            return [128, 128, 128];
+        }
+
         if (/^#[0-9a-f]{3}$/i.test(color)) {
-            return color.slice(1).split("").map(c =>
-                parseInt(c + c, 16)
-            );
+            return color
+                .slice(1)
+                .split("")
+                .map(c => parseInt(c + c, 16));
         }
 
         if (/^#[0-9a-f]{6}$/i.test(color)) {
@@ -235,56 +317,118 @@ function createSauceColor(ids) {
         }
 
         return [128, 128, 128];
-    });
+    }
 
-    // Mescola i colori con una media RGB pesata.
-    // I pesi cambiano in base all'identità degli ingredienti.
-    let seed = 2166136261;
+    function createSauceColor(ids) {
+        // Ordinamento: il colore non dipende dall'ordine
+        // in cui gli ingredienti vengono selezionati.
+        const sortedIds = ids.slice().sort();
 
-    ids.forEach(id => {
-        for (const char of id) {
-            seed = Math.imul(seed ^ char.charCodeAt(0), 16777619);
-        }
-    });
+        const colors = sortedIds.map(id => {
+            return parseColor(
+                getDefinition(id).color
+            );
+        });
 
-    const weights = colors.map((_, i) => {
-        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-        return 0.5 + (seed / 4294967295);
-    });
+        // Seed deterministico della combinazione.
+        let seed = hash(sortedIds.join("+"));
 
-    const totalWeight = weights.reduce((a, b) => a + b, 0);
+        const weights = colors.map(() => {
+            seed = (
+                Math.imul(seed, 1664525) +
+                1013904223
+            ) >>> 0;
 
-    const rgb = [0, 1, 2].map(channel => {
-        const value = colors.reduce(
-            (sum, color, i) => sum + color[channel] * weights[i],
+            return 0.5 + seed / 4294967295;
+        });
+
+        const totalWeight = weights.reduce(
+            (sum, weight) => sum + weight,
             0
-        ) / totalWeight;
+        );
 
-        return Math.round(value);
-    });
+        const rgb = [0, 1, 2].map(channel => {
+            const value = colors.reduce(
+                (sum, color, index) => {
+                    return (
+                        sum +
+                        color[channel] * weights[index]
+                    );
+                },
+                0
+            ) / totalWeight;
 
-    return "#" + rgb
-        .map(value => value.toString(16).padStart(2, "0"))
-        .join("");
-}
+            return Math.max(
+                0,
+                Math.min(255, Math.round(value))
+            );
+        });
 
+        return (
+            "#" +
+            rgb
+                .map(value =>
+                    value.toString(16).padStart(2, "0")
+                )
+                .join("")
+        );
+    }
+
+    // --------------------------------------------------
+    // PROPRIETÀ DELLA SALSA
+    // --------------------------------------------------
+
+    function applySauceProperties(target, data) {
+        if (!target || typeof target !== "object") {
+            return;
+        }
+
+        // Proprietà principali della definizione.
+        target.id = data.id;
+        target.name = data.name;
+        target.color = data.color;
+        target.type = "liquid";
+        target.shape = data.shape;
+
+        // Metadati aggiuntivi: il supporto dipende
+        // dalla versione del motore del gioco.
+        target.category = "liquid";
+        target.state = "liquid";
+        target.isLiquid = true;
+
+        target.keywords = data.keywords;
+        target.sauceMaker = true;
+        target.sauceIngredients =
+            data.sauceIngredients.slice();
+
+        target.sauceNutrients = {
+            ...data.sauceNutrients
+        };
+
+        target.sauceNutrientSources =
+            data.sauceNutrientSources;
+    }
 
     // --------------------------------------------------
     // DATABASE RICERCABILE
     // --------------------------------------------------
 
-    let panel;
-    let list;
-    let search;
-    let status;
-
     function button(label, callback) {
         const el = document.createElement("button");
+
+        el.type = "button";
         el.textContent = label;
+
         el.style.cssText =
-            "padding:7px 10px;border:0;border-radius:6px;" +
-            "background:#8c4fc4;color:white;cursor:pointer;";
+            "padding:7px 10px;" +
+            "border:0;" +
+            "border-radius:6px;" +
+            "background:#8c4fc4;" +
+            "color:white;" +
+            "cursor:pointer;";
+
         el.addEventListener("click", callback);
+
         return el;
     }
 
@@ -293,47 +437,105 @@ function createSauceColor(ids) {
 
         list.replaceChildren();
 
-        const query = (search.value || "").toLowerCase().trim();
-        const matches = sauceDatabase.filter(item =>
-            item.name.toLowerCase().includes(query) ||
-            item.id.toLowerCase().includes(query) ||
-            item.ingredients.join(" ").toLowerCase().includes(query)
-        );
+        const query = (search?.value || "")
+            .toLowerCase()
+            .trim();
+
+        const matches = sauceDatabase.filter(item => {
+            const name = String(item.name || "").toLowerCase();
+            const id = String(item.id || "").toLowerCase();
+
+            const itemIngredients = Array.isArray(item.ingredients)
+                ? item.ingredients.join(" ").toLowerCase()
+                : "";
+
+            return (
+                name.includes(query) ||
+                id.includes(query) ||
+                itemIngredients.includes(query)
+            );
+        });
 
         matches.forEach(item => {
             const row = document.createElement("div");
+
             row.style.cssText =
-                "padding:9px;margin:4px 0;background:#30243b;" +
-                "border-radius:7px;overflow-wrap:anywhere;";
+                "padding:9px;" +
+                "margin:4px 0;" +
+                "background:#30243b;" +
+                "border-radius:7px;" +
+                "overflow-wrap:anywhere;";
 
             const title = document.createElement("strong");
+
             title.textContent = "🥣 " + item.name;
 
+            const swatch = document.createElement("span");
+
+            swatch.style.cssText =
+                "display:inline-block;" +
+                "width:13px;" +
+                "height:13px;" +
+                "margin-left:8px;" +
+                "border-radius:50%;" +
+                "border:1px solid #fff8;" +
+                "vertical-align:middle;" +
+                "background:" +
+                (/^#[0-9a-f]{6}$/i.test(item.color || "")
+                    ? item.color
+                    : "#808080") +
+                ";";
+
+            title.appendChild(swatch);
+
             const details = document.createElement("div");
+
             details.style.cssText =
-                "font-size:12px;color:#ddd;margin-top:5px;";
+                "font-size:12px;" +
+                "color:#ddd;" +
+                "margin-top:5px;";
+
+            const itemIds = Array.isArray(item.ingredients)
+                ? item.ingredients
+                : [];
+
             details.textContent =
-                "ID: " + item.id + " | Ingredienti: " +
-                item.ingredients.map(getName).join(", ");
+                "ID: " + item.id +
+                " | Ingredienti: " +
+                itemIds.map(getName).join(", ");
 
             const nutrientLine = document.createElement("div");
+
             nutrientLine.style.cssText =
-                "font-size:12px;color:#c6e6d2;margin-top:5px;";
+                "font-size:12px;" +
+                "color:#c6e6d2;" +
+                "margin-top:5px;";
 
-            const nutrientEntries = Object.entries(item.nutrients || {});
+            const nutrientEntries = Object.entries(
+                item.nutrients || {}
+            );
+
             nutrientLine.textContent = nutrientEntries.length
-                ? "Nutrienti: " + nutrientEntries
-                    .map(([key, value]) => key + "=" + value)
-                    .join(", ")
-                : "Nessun campo nutrizionale riconosciuto nei dati originali.";
+                ? "Nutrienti: " +
+                    nutrientEntries
+                        .map(([key, value]) => key + "=" + value)
+                        .join(", ")
+                : "Nessun campo nutrizionale riconosciuto.";
 
-            row.append(title, details, nutrientLine);
+            row.append(
+                title,
+                details,
+                nutrientLine
+            );
+
             list.appendChild(row);
         });
 
-        if (!matches.length) {
+        if (matches.length === 0) {
             const empty = document.createElement("div");
+
             empty.textContent = "Nessuna salsa trovata.";
+
             list.appendChild(empty);
         }
     }
@@ -343,53 +545,82 @@ function createSauceColor(ids) {
 
         panel = document.createElement("div");
         panel.id = PREFIX + "-panel";
+
         panel.style.cssText =
-            "position:fixed;right:14px;bottom:75px;width:360px;" +
-            "max-width:calc(100vw - 28px);max-height:70vh;" +
-            "overflow:auto;z-index:999999;background:#21192a;" +
-            "color:#fff;border:2px solid #8c4fc4;border-radius:12px;" +
-            "padding:12px;font:14px Arial,sans-serif;display:none;" +
+            "position:fixed;" +
+            "right:14px;" +
+            "bottom:75px;" +
+            "width:360px;" +
+            "max-width:calc(100vw - 28px);" +
+            "max-height:70vh;" +
+            "overflow:auto;" +
+            "z-index:999999;" +
+            "background:#21192a;" +
+            "color:#fff;" +
+            "border:2px solid #8c4fc4;" +
+            "border-radius:12px;" +
+            "padding:12px;" +
+            "font:14px Arial,sans-serif;" +
+            "display:none;" +
             "box-shadow:0 5px 25px #0009;";
 
         const heading = document.createElement("h3");
+
         heading.textContent = "🥣 SauceMaker — Database";
         heading.style.marginTop = "0";
 
         search = document.createElement("input");
+
         search.type = "search";
         search.placeholder = "Cerca salsa o ingrediente...";
+
         search.style.cssText =
-            "box-sizing:border-box;width:100%;padding:9px;" +
+            "box-sizing:border-box;" +
+            "width:100%;" +
+            "padding:9px;" +
             "margin-bottom:8px;";
+
         search.addEventListener("input", renderDB);
 
         list = document.createElement("div");
 
         status = document.createElement("div");
+
         status.style.cssText =
-            "margin:9px 0;color:#e2c9ff;font-size:12px;";
+            "margin:9px 0;" +
+            "color:#e2c9ff;" +
+            "font-size:12px;";
 
         panel.append(
             heading,
             search,
             list,
             status,
-            button("Chiudi", () => panel.style.display = "none"),
+            button("Chiudi", () => {
+                panel.style.display = "none";
+            }),
             button("Azzera selezione", resetSelection)
         );
 
         document.body.appendChild(panel);
+
         renderDB();
     }
 
     function showStatus(message) {
         console.log("[SauceMaker]", message);
-        if (status) status.textContent = message;
+
+        if (status) {
+            status.textContent = message;
+        }
     }
 
     function resetSelection() {
         selected = [];
-        showStatus("Selezione azzerata. Scegli 4 ingredienti.");
+
+        showStatus(
+            "Selezione azzerata. Scegli 4 ingredienti."
+        );
     }
 
     // --------------------------------------------------
@@ -397,75 +628,122 @@ function createSauceColor(ids) {
     // --------------------------------------------------
 
     function createSauce(ids, placed) {
-        const name = createSauceName(ids);
-        const id = "sauce_" + cleanId(name) + "_" +
-            hash(ids.slice().sort().join("+")).toString(36);
+        const sortedIds = ids.slice().sort();
 
-        const nutrition = combineNutrients(ids);
+        const name = createSauceName(sortedIds);
+
+        const combinationHash = hash(
+            getCombinationKey(sortedIds)
+        );
+
+        const id =
+            "sauce_" +
+            cleanId(name) +
+            "_" +
+            combinationHash.toString(36);
+
+        const color = createSauceColor(sortedIds);
+
+        const nutrition = combineNutrients(sortedIds);
 
         const data = {
+            id: id,
             name: name,
-            color: createSauceColor(ids),
+            color: color,
+
+            // Proprietà liquide principali.
             type: "liquid",
-            shape: "blob_short",
+
+            // Forma prudenziale: verificare che "blob"
+            // sia supportata dalla versione del gioco.
+            shape: "blob",
+
+            category: "liquid",
+            state: "liquid",
+            isLiquid: true,
+
             keywords:
                 "sauce, sauce maker, custom sauce, nutrient, " +
-                "salsa, " + ids.join(", "),
-            // Metadati della mod, senza inventare valori nutrizionali.
+                "salsa, liquid, " + sortedIds.join(", "),
+
             sauceMaker: true,
-            sauceIngredients: ids.slice(),
-            sauceNutrients: nutrition.totals,
-            sauceNutrientSources: nutrition.sourcesFound
+            sauceIngredients: sortedIds.slice(),
+
+            sauceNutrients: {
+                ...nutrition.totals
+            },
+
+            sauceNutrientSources:
+                nutrition.sourcesFound
         };
 
+        // Registra o aggiorna la definizione.
         if (!ingredients[id]) {
             addIngredient(id, data);
-        } else {
-            Object.assign(ingredients[id], data);
         }
 
-        // Alcune versioni richiedono l'aggiornamento esplicito
-        // dell'oggetto ingredienti dopo addIngredient().
-        if (ingredients[id]) {
-            Object.assign(ingredients[id], data);
+        // addIngredient potrebbe creare una propria copia
+        // della definizione: riapplica i dati al risultato.
+        if (!ingredients[id]) {
+            console.error(
+                "[SauceMaker] La salsa non è stata registrata:",
+                id
+            );
+
+            throw new Error(
+                "addIngredient non ha registrato la salsa."
+            );
         }
 
+        Object.assign(ingredients[id], data);
+
+        // Il quarto elemento diventa la salsa.
+        // L'ID e il colore derivano dalla combinazione,
+        // non dall'ultimo ingrediente.
+        if (placed && typeof placed === "object") {
+            applySauceProperties(placed, data);
+        }
+
+        // Aggiorna il database locale.
         const record = {
             id: id,
             name: name,
-            ingredients: ids.slice(),
-            nutrients: nutrition.totals,
+            color: color,
+            type: "liquid",
+            shape: data.shape,
+            ingredients: sortedIds.slice(),
+            nutrients: {
+                ...nutrition.totals
+            },
             sourcesFound: nutrition.sourcesFound,
             date: new Date().toLocaleString()
         };
 
-        const existing = sauceDatabase.findIndex(item => item.id === id);
+        const existingIndex = sauceDatabase.findIndex(
+            item => item.id === id
+        );
 
-        if (existing >= 0) sauceDatabase[existing] = record;
-        else sauceDatabase.unshift(record);
+        if (existingIndex >= 0) {
+            sauceDatabase[existingIndex] = record;
+        } else {
+            sauceDatabase.unshift(record);
+        }
 
         saveDB();
         renderDB();
 
-        // Il quarto ingrediente diventa la salsa creata.
-        if (placed && typeof placed === "object") {
-            placed.id = id;
-            placed.name = name;
-            placed.type = "liquid";
-            placed.color = data.color;
-            placed.sauceMaker = true;
-            placed.sauceIngredients = ids.slice();
-            placed.sauceNutrients = nutrition.totals;
-        }
-
         showStatus(
-            "Creata " + name + " da: " +
-            ids.map(getName).join(", ") +
-            ". Campi nutrizionali: " +
-            Object.keys(nutrition.totals).length + "."
+            "Creata " + name +
+            " | Liquida | Colore: " + color +
+            " | Ingredienti: " +
+            sortedIds.map(getName).join(", ") +
+            " | Campi nutrizionali: " +
+            Object.keys(nutrition.totals).length
         );
 
         console.log("[SauceMaker] Nuova salsa:", record);
+
+        return record;
     }
 
     // --------------------------------------------------
@@ -480,9 +758,11 @@ function createSauceColor(ids) {
 
         onSelect: function () {
             createPanel();
+
             panel.style.display = "block";
+
             showStatus(
-                "Clicca 4 ingredienti diversi, uno alla volta."
+                "Clicca 4 ingredienti distinti, uno alla volta."
             );
         },
 
@@ -490,14 +770,16 @@ function createSauceColor(ids) {
             const id = getId(placed);
 
             if (!id) {
-                showStatus("Ingrediente non riconosciuto.");
+                showStatus(
+                    "Ingrediente non riconosciuto."
+                );
                 return;
             }
 
-            // Evita di selezionare due volte lo stesso ingrediente.
             if (selected.includes(id)) {
                 showStatus(
-                    getName(id) + " è già nella selezione."
+                    getName(id) +
+                    " è già nella selezione."
                 );
                 return;
             }
@@ -505,55 +787,91 @@ function createSauceColor(ids) {
             selected.push(id);
 
             showStatus(
-                "Ingrediente " + selected.length + "/4: " +
+                "Ingrediente " +
+                selected.length + "/" +
+                INGREDIENT_COUNT + ": " +
                 getName(id)
             );
 
-            if (selected.length < 4) return;
+            if (selected.length < INGREDIENT_COUNT) {
+                return;
+            }
 
-            const chosen = selected.slice(0, 4);
+            const chosen = selected.slice(
+                0,
+                INGREDIENT_COUNT
+            );
+
             selected = [];
 
             try {
                 createSauce(chosen, placed);
             } catch (error) {
-                console.error("[SauceMaker] Errore:", error);
-                showStatus("Errore durante la creazione della salsa.");
+                console.error(
+                    "[SauceMaker] Errore:",
+                    error
+                );
+
+                showStatus(
+                    "Errore durante la creazione della salsa."
+                );
             }
         }
     });
 
-    // Pulsante per aprire il database anche senza selezionare il tool.
+    // --------------------------------------------------
+    // PULSANTE DATABASE
+    // --------------------------------------------------
+
     function initialize() {
         createPanel();
 
-        if (!document.getElementById(PREFIX + "-launcher")) {
-            const launcher = button("🥣 SauceMaker DB", function () {
-                createPanel();
-                panel.style.display =
-                    panel.style.display === "none" ? "block" : "none";
-                renderDB();
-            });
+        if (
+            !document.getElementById(
+                PREFIX + "-launcher"
+            )
+        ) {
+            const launcher = button(
+                "🥣 SauceMaker DB",
+                function () {
+                    createPanel();
+
+                    panel.style.display =
+                        panel.style.display === "none"
+                            ? "block"
+                            : "none";
+
+                    renderDB();
+                }
+            );
 
             launcher.id = PREFIX + "-launcher";
+
             launcher.style.cssText +=
-                "position:fixed;right:14px;bottom:14px;" +
-                "z-index:999999;padding:11px;" +
+                "position:fixed;" +
+                "right:14px;" +
+                "bottom:14px;" +
+                "z-index:999999;" +
+                "padding:11px;" +
                 "border:2px solid #c7a1ed;";
 
             document.body.appendChild(launcher);
         }
 
         console.log(
-            "[SauceMaker] Caricato. Usa il tool e seleziona 4 ingredienti."
+            "[SauceMaker] Caricato. " +
+            "Usa il tool e seleziona 4 ingredienti."
         );
     }
 
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", initialize, {
-            once: true
-        });
+        document.addEventListener(
+            "DOMContentLoaded",
+            initialize,
+            { once: true }
+        );
     } else {
         initialize();
     }
 })();
+
