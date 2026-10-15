@@ -4,7 +4,8 @@
 
     // =========================================================
     // INFINITE CHEF - AFFUMICATORE UNIVERSALE
-    // Ricette tramite reactions, senza chiamare addRecipe()
+    // Preserva forma e colori originali quando disponibili
+    // Ricette tramite reactions
     // Database visivo persistente
     // =========================================================
 
@@ -21,6 +22,7 @@
         return;
     }
 
+    const ingredients = window.ingredients;
     let database = [];
 
     try {
@@ -67,7 +69,7 @@
     }
 
     // ---------------------------------------------------------
-    // INGREDIENTI AFFUMICATI
+    // INGREDIENTI AFFUMICATI PREDEFINITI
     // ---------------------------------------------------------
 
     const definitions = [
@@ -93,8 +95,7 @@
     definitions.forEach(function (entry) {
         const id = entry[0];
 
-        // Non sovrascrive ingredienti già registrati.
-        if (!window.ingredients[id]) {
+        if (!ingredients[id]) {
             addIngredient(id, {
                 color: entry[1],
                 innerColor: entry[2],
@@ -104,7 +105,7 @@
     });
 
     // ---------------------------------------------------------
-    // RICETTE PREDEFINITE TRAMITE REACTIONS
+    // RICETTE PREDEFINITE
     // ---------------------------------------------------------
 
     const recipePairs = [
@@ -125,7 +126,7 @@
     recipePairs.forEach(function (pair) {
         const baseId = pair[0];
         const resultId = pair[1];
-        const base = window.ingredients[baseId];
+        const base = ingredients[baseId];
 
         if (!base) {
             console.warn(
@@ -220,6 +221,12 @@
 
         if (existingPanel) {
             panel = existingPanel;
+
+            list = panel.querySelector("[data-smoker-list]");
+            search = panel.querySelector("[data-smoker-search]");
+            count = panel.querySelector("[data-smoker-count]");
+            statusElement = panel.querySelector("[data-smoker-status]");
+
             return;
         }
 
@@ -253,6 +260,7 @@
         search = document.createElement("input");
         search.type = "search";
         search.placeholder = "Cerca ingrediente...";
+        search.dataset.smokerSearch = "";
 
         search.style.cssText =
             "box-sizing:border-box;width:100%;padding:9px;" +
@@ -262,17 +270,20 @@
         search.addEventListener("input", renderDatabase);
 
         count = document.createElement("div");
+        count.dataset.smokerCount = "";
 
         count.style.cssText =
             "margin:5px 0 9px;color:#e8b98e;";
 
         list = document.createElement("div");
+        list.dataset.smokerList = "";
 
         list.style.cssText =
             "display:flex;flex-direction:column;gap:6px;" +
             "max-height:30vh;overflow:auto;";
 
         statusElement = document.createElement("div");
+        statusElement.dataset.smokerStatus = "";
 
         statusElement.style.cssText =
             "font-size:12px;color:#e8b98e;margin-top:10px;";
@@ -442,183 +453,212 @@
     }
 
     // ---------------------------------------------------------
+    // UTILITÀ: COPIA PROPRIETÀ VISIVE
+    // ---------------------------------------------------------
+
+    function copyIfPresent(target, source, key) {
+        if (
+            source &&
+            Object.prototype.hasOwnProperty.call(source, key)
+        ) {
+            target[key] = source[key];
+        }
+    }
+
+    // ---------------------------------------------------------
     // STRUMENTO AFFUMICATORE UNIVERSALE
     // ---------------------------------------------------------
 
+    addTool("smoker", {
+        name: "Affumicatore universale",
 
-addTool("smoker", {
-    name: "Affumicatore universale",
-    shape: "liquid",
-    color: "#69412f",
-    spin: true,
-
-    onSelect: function () {
-        createPanel();
-
-        if (statusElement) {
-            statusElement.textContent =
-                "Affumicatore pronto: clicca un ingrediente.";
-        }
-    },
-
-    func: function (placed) {
-        if (!placed || typeof placed !== "object") {
-            console.warn(
-                "[Affumicatore] Oggetto non valido:",
-                placed
-            );
-            return;
-        }
-
-        // Evita di elaborare più volte lo stesso oggetto.
-        if (
-            placed.universalSmokerProcessing ||
-            placed.universalSmokerDone
-        ) {
-            return;
-        }
-
-        placed.universalSmokerProcessing = true;
-
-        try {
-            console.log(
-                "[Affumicatore] Oggetto ricevuto:",
-                placed
-            );
-
-            // Individua l'ID originale.
-            const possibiliId = [
-                placed.id,
-                placed.ingredientId,
-                placed.ingredient_id,
-                placed.elementId,
-                placed.element_id,
-                placed.data && placed.data.id,
-                placed.ingredient
-            ];
-
-            let originalId = null;
-
-            for (const valore of possibiliId) {
-                if (
-                    typeof valore === "string" &&
-                    valore.trim() !== ""
-                ) {
-                    originalId = valore;
-                    break;
-                }
-
-                if (
-                    valore &&
-                    typeof valore === "object" &&
-                    typeof valore.id === "string" &&
-                    valore.id.trim() !== ""
-                ) {
-                    originalId = valore.id;
-                    break;
-                }
-            }
-
-            if (!originalId) {
-                console.error(
-                    "[Affumicatore] ID non trovato:",
-                    Object.keys(placed)
-                );
-
-                if (statusElement) {
-                    statusElement.textContent =
-                        "Non riesco a identificare l'ingrediente.";
-                }
-
-                return;
-            }
-
-            // Non aggiunge nuovamente il suffisso.
-            const smokedId = originalId.endsWith("_smoked")
-                ? originalId
-                : originalId + "_smoked";
-
-            // Recupera il nome originale.
-            const definizione =
-                typeof ingredients !== "undefined"
-                    ? ingredients[originalId]
-                    : null;
-
-            const originalName =
-                (definizione && definizione.name) ||
-                placed.name ||
-                originalId;
-
-            
-const nomeBase = originalName.replace(/_smoked$/, "");
-
-const smokedName = nomeBase + " (affumicato)";
-
-// Registra l'affumicato come ingrediente indipendente.
-if (
-    typeof ingredients !== "undefined" &&
-    !ingredients[smokedId]
-) {
-    addIngredient(smokedId, {
-        name: smokedName,
+        // Aspetto dello strumento, non dell'ingrediente trattato.
+        shape: "liquid",
         color: "#69412f",
-        h: 20,
-        s: 45,
-        l: 35,
-        reactions: {}
-    });
-}
+        spin: true,
 
-// Aggiorna l'oggetto affumicato.
-placed.id = smokedId;
-placed.name = smokedName;
-placed.smoked = true;
-placed.universalSmokerDone = true;
-
-placed.h = 20;
-placed.s = 45;
-placed.l = 35;
-
-// Aggiunge l'ingrediente al database ricercabile.
-registerSmoked(placed, smokedId);
-
-
-            // Aggiorna l'oggetto.
-            placed.id = smokedId;
-            placed.name = smokedName;
-            placed.smoked = true;
-            placed.universalSmokerDone = true;
-
-            placed.h = 20;
-            placed.s = 45;
-            placed.l = 35;
-
-            // Registra nel database già esistente.
-            registerSmoked(placed, smokedId);
+        onSelect: function () {
+            createPanel();
 
             if (statusElement) {
                 statusElement.textContent =
-                    "Affumicato: " + smokedName;
+                    "Affumicatore pronto: clicca un ingrediente.";
+            }
+        },
+
+        func: function (placed) {
+            if (!placed || typeof placed !== "object") {
+                console.warn(
+                    "[Affumicatore] Oggetto non valido:",
+                    placed
+                );
+                return;
             }
 
-            console.log(
-                "[Affumicatore] Risultato:",
-                smokedId,
-                smokedName
-            );
-        } catch (errore) {
-            console.error(
-                "[Affumicatore] Errore:",
-                errore
-            );
-        } finally {
-            delete placed.universalSmokerProcessing;
+            if (
+                placed.universalSmokerProcessing ||
+                placed.universalSmokerDone
+            ) {
+                return;
+            }
+
+            placed.universalSmokerProcessing = true;
+
+            try {
+                console.log(
+                    "[Affumicatore] Oggetto ricevuto:",
+                    placed
+                );
+
+                // Individua l'ID originale.
+                const possibiliId = [
+                    placed.id,
+                    placed.ingredientId,
+                    placed.ingredient_id,
+                    placed.elementId,
+                    placed.element_id,
+                    placed.data && placed.data.id,
+                    placed.ingredient
+                ];
+
+                let originalId = null;
+
+                for (const valore of possibiliId) {
+                    if (
+                        typeof valore === "string" &&
+                        valore.trim() !== ""
+                    ) {
+                        originalId = valore;
+                        break;
+                    }
+
+                    if (
+                        valore &&
+                        typeof valore === "object" &&
+                        typeof valore.id === "string" &&
+                        valore.id.trim() !== ""
+                    ) {
+                        originalId = valore.id;
+                        break;
+                    }
+                }
+
+                if (!originalId) {
+                    console.error(
+                        "[Affumicatore] ID non trovato:",
+                        Object.keys(placed)
+                    );
+
+                    if (statusElement) {
+                        statusElement.textContent =
+                            "Non riesco a identificare l'ingrediente.";
+                    }
+
+                    return;
+                }
+
+                // Recupera la definizione originale prima di cambiare ID.
+                const originalDefinition = ingredients[originalId] || {};
+
+                // Se è già affumicato, non aggiungere un altro suffisso.
+                const smokedId = originalId.endsWith("_smoked")
+                    ? originalId
+                    : originalId + "_smoked";
+
+                const originalName =
+                    originalDefinition.name ||
+                    placed.name ||
+                    prettyName(originalId);
+
+                const baseName = String(originalName)
+                    .replace(/_smoked$/, "")
+                    .replace(/\s*\(affumicato\)$/i, "");
+
+                const smokedName = baseName + " (affumicato)";
+
+                // Salva le proprietà visive dell'oggetto originale.
+                const visualSource = {};
+
+                [
+                    "shape",
+                    "color",
+                    "innerColor",
+                    "type",
+                    "h",
+                    "s",
+                    "l",
+                    "width",
+                    "height",
+                    "size",
+                    "texture",
+                    "emoji",
+                    "image"
+                ].forEach(function (key) {
+                    if (
+                        placed[key] !== undefined &&
+                        placed[key] !== null
+                    ) {
+                        visualSource[key] = placed[key];
+                    } else {
+                        copyIfPresent(
+                            visualSource,
+                            originalDefinition,
+                            key
+                        );
+                    }
+                });
+
+                // Crea la definizione solo se non esiste già.
+                if (!ingredients[smokedId]) {
+                    const newDefinition = {
+                        name: smokedName,
+                        reactions: {}
+                    };
+
+                    Object.keys(visualSource).forEach(function (key) {
+                        newDefinition[key] = visualSource[key];
+                    });
+
+                    // Non assegna colori o forme artificiali:
+                    // conserva quelli originali disponibili.
+                    addIngredient(smokedId, newDefinition);
+                }
+
+                // Aggiorna l'oggetto senza imporre una nuova forma
+                // né forzare tonalità, saturazione o luminosità.
+                placed.id = smokedId;
+                placed.name = smokedName;
+                placed.smoked = true;
+                placed.universalSmokerDone = true;
+
+                Object.keys(visualSource).forEach(function (key) {
+                    placed[key] = visualSource[key];
+                });
+
+                // Registra una sola volta nel database.
+                registerSmoked(placed, smokedId);
+
+                if (statusElement) {
+                    statusElement.textContent =
+                        "Affumicato: " + smokedName;
+                }
+
+                console.log(
+                    "[Affumicatore] Risultato:",
+                    smokedId,
+                    smokedName,
+                    visualSource
+                );
+            } catch (errore) {
+                console.error(
+                    "[Affumicatore] Errore:",
+                    errore
+                );
+            } finally {
+                delete placed.universalSmokerProcessing;
+            }
         }
-    }
-});
-
-
-
+    });
 
     // ---------------------------------------------------------
     // AVVIO
