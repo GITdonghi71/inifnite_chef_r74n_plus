@@ -1,259 +1,94 @@
-addIngredient("mb_vanilla_dough", {
-    color: "#d9b77b",
-    innerColor: "#a47b45",
-    type: "dough"
+
+ // Back to Christmas — mod per Infinite Chef (R74n)
+// Aggiunge ingredienti natalizi e ricette a tema.
+
+addIngredient("christmas_candy_cane", {
+    color: "#FFFFFF",
+    type: "candy",
+    shape: "cane_striped",
+    meltPoint: 120,
+    meltInto: "caramel",
+    keywords: "christmas, candy cane, peppermint, natale, bastoncino"
 });
 
-// Impasto al cacao
-addIngredient("mb_cocoa_dough", {
-    color: "#76503b",
-    innerColor: "#392116",
-    type: "dough"
+addIngredient("gingerbread_cookie", {
+    color: "#B8753D",
+    type: "carb",
+    shape: "figure",
+    cookColor: "#8C4E2A",
+    keywords: "christmas, gingerbread, cookie, natale, biscotto"
 });
 
-// Crema alla nocciola
-addIngredient("mb_hazelnut_cream", {
-    color: "#8b522d",
-    innerColor: "#4b2817",
-    type: "thick_liquid"
+addIngredient("christmas_star", {
+    color: "#FFD34E",
+    type: "candy",
+    shape: "stellated_octahedron",
+    glow: "#FFF1A8",
+    meltPoint: 120,
+    meltInto: "caramel",
+    keywords: "christmas, star, natale, stella"
 });
 
-// Crema al cacao
-addIngredient("mb_chocolate_cream", {
-    color: "#552d1d",
-    innerColor: "#29150d",
-    type: "thick_liquid"
+addIngredient("christmas_pudding", {
+    color: "#6B3827",
+    innerColor: "#B8753D",
+    type: "cake",
+    shape: "blob_short",
+    keywords: "christmas, pudding, dessert, natale, budino"
 });
 
-// ============================================================
-// BISCOTTI
-// ============================================================
-
-// ------------------------------------------------------------
-// ABBRACCI
-// Vaniglia + cacao
-// ------------------------------------------------------------
-
-addIngredient("abbracci", {
-    color: "#a87548",
-    innerColor: "#4b2a1b",
-    type: "cookie"
+addIngredient("holiday_cookie", {
+    color: "#D9A15B",
+    type: "carb",
+    shape: "rectangle_vertical_round",
+    cookColor: "#A96B36",
+    keywords: "holiday, christmas, cookie, natale, biscotto"
 });
 
-addRecipe(
-    "mb_vanilla_dough+mb_cocoa_dough",
-    "abbracci"
-);
-
-// ------------------------------------------------------------
-// PAN DI STELLE
-// Cacao + zucchero
-// ------------------------------------------------------------
-
-addIngredient("pan_di_stelle", {
-    color: "#3e2921",
-    innerColor: "#21140f",
-    type: "cookie"
+addIngredient("snowball_truffle", {
+    color: "#FFFDF5",
+    innerColor: "#6B3827",
+    type: "chocolate",
+    shape: "circle",
+    meltPoint: 35,
+    meltInto: "chocolate_icing",
+    keywords: "snowball, truffle, chocolate, christmas, tartufo"
 });
 
-addRecipe(
-    "mb_cocoa_dough+sugar",
-    "pan_di_stelle"
-);
-
-// ------------------------------------------------------------
-// GOCCIOLE
-// Impasto + gocce di cioccolato
-// ------------------------------------------------------------
-
-addIngredient("gocciole", {
-    color: "#ad7547",
-    innerColor: "#472519",
-    type: "cookie"
+addIngredient("christmas_wreath", {
+    color: "#23834A",
+    innerColor: "#D82F3D",
+    type: "vegetable",
+    shape: "circle",
+    keywords: "christmas, wreath, holly, natale, ghirlanda"
 });
 
-addRecipe(
-    "dough+chocolate_chip",
-    "gocciole"
-);
-
-// ------------------------------------------------------------
-// BAIOCCHI
-// Biscotto + crema alla nocciola
-// ------------------------------------------------------------
-
-addIngredient("baiocchi", {
-    color: "#b57a45",
-    innerColor: "#713d20",
-    type: "cookie"
+addIngredient("holiday_cocoa", {
+    color: "#6B3827",
+    type: "liquid",
+    shape: "blob_short",
+    keywords: "hot chocolate, cocoa, christmas, natale, cioccolata calda"
 });
 
-addRecipe(
-    "dough+mb_hazelnut_cream",
-    "baiocchi"
-);
-
-// ------------------------------------------------------------
-// MACINE
-// Biscotto alla panna
-// ------------------------------------------------------------
-
-addIngredient("macine", {
-    color: "#d5ae72",
-    innerColor: "#875d31",
-    type: "cookie"
+addIngredient("christmas_tree_cookie", {
+    color: "#27864B",
+    type: "carb",
+    shape: "triangle_round",
+    cookColor: "#176235",
+    keywords: "christmas tree, cookie, natale, albero"
 });
 
-addRecipe(
-    "dough+cream",
-    "macine"
-);
-
-// ------------------------------------------------------------
-// TARALLUCCI
-// Biscotto semplice con uovo e zucchero
-// ------------------------------------------------------------
-
-addIngredient("tarallucci", {
-    color: "#d4aa6b",
-    innerColor: "#80552d",
-    type: "cookie"
-});
-
-addRecipe(
-    "dough+egg+sugar",
-    "tarallucci"
-);
-
-// ------------------------------------------------------------
-// RITORNELLI
-// Cacao + mandorla
-// ------------------------------------------------------------
-
-addIngredient("ritornelli", {
-    color: "#8d684d",
-    innerColor: "#3e281b",
-    type: "cookie"
-});
-
-addRecipe(
-    "dough+almond+cocoa_bean",
-    "ritornelli"
-);
-
-// ------------------------------------------------------------
-// BATTICUORI
-// Cacao + cioccolato
-// ------------------------------------------------------------
-
-addIngredient("batticuori", {
-    color: "#5a3022",
-    innerColor: "#29140e",
-    type: "cookie"
-});
-
-addRecipe(
-    "mb_cocoa_dough+chocolate",
-    "batticuori"
-);
-
-// ------------------------------------------------------------
-// NASCONDINI
-// Biscotto con ripieno al cacao
-// ------------------------------------------------------------
-
-addIngredient("nascondini", {
-    color: "#a66f43",
-    innerColor: "#452318",
-    type: "cookie"
-});
-
-addRecipe(
-    "dough+mb_chocolate_cream",
-    "nascondini"
-);
-
-// ------------------------------------------------------------
-// MOLINETTI
-// Farina + zucchero + burro
-// ------------------------------------------------------------
-
-addIngredient("molinetti", {
-    color: "#c49b65",
-    innerColor: "#76502e",
-    type: "cookie"
-});
-
-addRecipe(
-    "dough+flour+sugar+butter",
-    "molinetti"
-);
-
-// ------------------------------------------------------------
-// CAMPAGNOLE
-// Latte + burro
-// ------------------------------------------------------------
-
-addIngredient("campagnole", {
-    color: "#dfbd83",
-    innerColor: "#93683c",
-    type: "cookie"
-});
-
-addRecipe(
-    "dough+milk+butter",
-    "campagnole"
-);
-
-// ------------------------------------------------------------
-// BAIOCCHI AL CACAO
-// Variante al cacao e nocciola
-// ------------------------------------------------------------
-
-addIngredient("baiocchi_cacao", {
-    color: "#75462c",
-    innerColor: "#3c2014",
-    type: "cookie"
-});
-
-addRecipe(
-    "mb_cocoa_dough+mb_hazelnut_cream",
-    "baiocchi_cacao"
-);
-
-// ============================================================
-// RICETTE EXTRA
-// ============================================================
-
-// Impasto alla vaniglia
-addRecipe(
-    "dough+vanilla",
-    "mb_vanilla_dough"
-);
-
-// Impasto al cacao
-addRecipe(
-    "dough+cocoa_bean",
-    "mb_cocoa_dough"
-);
-
-// Crema alla nocciola
-addRecipe(
-    "hazelnut+chocolate+cream",
-    "mb_hazelnut_cream"
-);
-
-// Crema al cacao
-addRecipe(
-    "chocolate+cream+sugar",
-    "mb_chocolate_cream"
-);
-
-// ============================================================
-// LOG
-// ============================================================
-
-console.log(
-    "Mulino_Bianco.js caricato: " +
-    "12 biscotti e ricette aggiuntive disponibili."
-);
+// Ricette natalizie
+addRecipe("sugar+christmas_candy_cane", "peppermint candy");
+addRecipe("gingerbread_cookie+icing", "decorated gingerbread cookie");
+addRecipe("gingerbread_cookie+chocolate icing", "chocolate gingerbread cookie");
+addRecipe("christmas_star+sugar", "shining christmas star");
+addRecipe("christmas_tree_cookie+icing", "decorated christmas tree cookie");
+addRecipe("christmas_tree_cookie+sprinkles", "festive christmas tree cookie");
+addRecipe("snowball_truffle+coconut", "snowball truffle");
+addRecipe("chocolate+cream+sugar", "christmas chocolate ganache");
+addRecipe("holiday_cocoa+milk+sugar", "hot chocolate");
+addRecipe("christmas_pudding+icing", "iced christmas pudding");
+addRecipe("christmas_wreath+christmas_star", "christmas centerpiece");
+addRecipe("gingerbread_cookie+christmas_candy_cane", "christmas cookie platter");
+addRecipe("christmas_pudding+christmas_star", "holiday feast");
