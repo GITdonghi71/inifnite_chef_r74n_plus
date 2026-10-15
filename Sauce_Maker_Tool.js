@@ -170,13 +170,30 @@
      */
     
 
-function createSauceId(ids) {
-    const sorted = ids
-        .map(id => cleanId(id).toLowerCase().replace(/[^a-z]/g, ""))
-        .sort();
 
-    return "sauce_" + sorted.join("_");
+function createSauceId(ids) {
+    const parts = ids.map(id => {
+        let value = cleanId(id).toLowerCase();
+
+        // Preserva il livello di innesto.
+        value = value.replace(/innesto\s*([12])/g, "innesto$1");
+
+        // Normalizza la struttura "innesto...con...".
+        value = value.replace(/innesto([12])\s*\.{2,}\s*con\s*\.{2,}/g,
+            "innesto$1_con_");
+
+        // Tutti i separatori diventano underscore.
+        value = value
+            .replace(/[^a-z0-9]+/g, "_")
+            .replace(/_+/g, "_")
+            .replace(/^_+|_+$/g, "");
+
+        return value;
+    });
+
+    return "sauce_" + parts.sort().join("_");
 }
+
 
 
 
