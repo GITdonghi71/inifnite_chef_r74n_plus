@@ -1,15 +1,17 @@
 
 /*
  * SauceFryer — Infinite Chef R74n+
- * Frittura universale in salsa, riservata a Bowl Mode.
  *
- * Compatibilità:
- * - SauceMaker: ingredients[id].sauceMaker / sauceIngredients
- * - Smoker: conserva i metadati e registra con addIngredient()
- * - Innestatore: il risultato è un normale ingrediente del database
- *
- * Nota: il rilevamento di Bowl Mode dipende dalla versione del gioco.
- * Il tool non cuoce se la modalità non è riconosciuta.
+ * Funzioni:
+ * - Frittura universale in salsa.
+ * - Utilizzabile esclusivamente in Bowl Mode.
+ * - Richiede il calore attivo.
+ * - Compatibile con SauceMaker.
+ * - Aggiornamento dinamico dell'elenco delle salse.
+ * - Protezione contro richiami ripetuti della cottura.
+ * - Messaggio di successo stampato una sola volta per risultato.
+ * - Pulsante per pulire il pannello.
+ * - Registrazione degli ingredienti cotti nel database generale.
  */
 
 (function () {
@@ -28,37 +30,45 @@
         return;
     }
 
-    Object.defineProperty(window, "__sauceFryerIngredients", {
-    configurable: true,
-    get() {
-        return window.ingredients;
-    }
-});
+    /*
+     * Riferimento dinamico al database.
+     * Consente di leggere window.ingredients anche se il gioco
+     * sostituisce l'oggetto globale durante il caricamento dei mod.
+     */
+    const ingredients = new Proxy(Object.create(null), {
+        get(_target, prop) {
+            return window.ingredients?.[prop];
+        },
 
-const ingredients = new Proxy({}, {
-    get(_target, prop) {
-        return window.ingredients?.[prop];
-    },
-    set(_target, prop, value) {
-        window.ingredients[prop] = value;
-        return true;
-    },
-    ownKeys() {
-        return Reflect.ownKeys(window.ingredients || {});
-    },
-    getOwnPropertyDescriptor(_target, prop) {
-        const descriptor = Object.getOwnPropertyDescriptor(
-            window.ingredients || {},
-            prop
-        );
-        return descriptor
-            ? { ...descriptor, configurable: true }
-            : undefined;
-    },
-    has(_target, prop) {
-        return prop in (window.ingredients || {});
-    }
-});
+        set(_target, prop, value) {
+            window.ingredients[prop] = value;
+            return true;
+        },
+
+        ownKeys() {
+            return Reflect.ownKeys(window.ingredients || {});
+        },
+
+        getOwnPropertyDescriptor(_target, prop) {
+            const descriptor = Object.getOwnPropertyDescriptor(
+                window.ingredients || {},
+                prop
+            );
+
+            if (!descriptor) return undefined;
+
+            return {
+                configurable: true,
+                enumerable: descriptor.enumerable,
+                writable: true,
+                value: window.ingredients[prop]
+            };
+        },
+
+        has(_target, prop) {
+            return prop in (window.ingredients || {});
+        }
+    });
 
     let selectedSauce = null;
     let heatEnabled = false;
@@ -70,6 +80,18 @@ const ingredients = new Proxy({}, {
     let database = [];
     let profiles = {};
 
+    /*
+     * Protezione dalle chiamate ripetute sullo stesso oggetto.
+     * WeakSet non mantiene artificialmente in memoria gli oggetti.
+     */
+    const processedObjects = new WeakSet();
+
+    /*
+     * Tiene traccia dei risultati per evitare messaggi di successo
+     * duplicati nella stessa sessione.
+     */
+    const loggedResults = new Set();
+
     try {
         const saved = JSON.parse(localStorage.getItem(DB_KEY) || "[]");
         database = Array.isArray(saved) ? saved : [];
@@ -78,7 +100,10 @@ const ingredients = new Proxy({}, {
     }
 
     try {
-        const saved = JSON.parse(localStorage.getItem(PROFILE_KEY) || "{}");
+        const saved = JSON.parse(
+            localStorage.getItem(PROFILE_KEY) || "{}"
+        );
+
         profiles = saved && typeof saved === "object" ? saved : {};
     } catch (_) {
         profiles = {};
@@ -89,53 +114,48 @@ const ingredients = new Proxy({}, {
             localStorage.setItem(DB_KEY, JSON.stringify(database));
             localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
         } catch (error) {
-            console.warn("[SauceFryer] Salvataggio non riuscito:", error);
+            console.warn(
+                "[SauceFryer] Salvataggio non riuscito:",
+                error
+            );
         }
     }
 
     function status(message) {
         console.log("[SauceFryer]", message);
-        if (statusElement) statusElement.textContent = message;
+
+        if (statusElement) {
+            statusElement.textContent = message;
+        }
     }
 
     // --------------------------------------------------
-    // MODALITÀ: fail closed se Bowl Mode non è verificabile
+    // MODALITÀ DI GIOCO
     // --------------------------------------------------
 
-    function normalize(value) {
-        return String(value || "")
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .trim();
+    function isBowlMode() {
+        const bowlButton = document.getElementById("button-bowl");
+
+        if (bowlButton) {
+            return bowlButton.hasAttribute("selected");
+        }
+
+        const mode =
+            window.mode ??
+            window.gameMode ??
+            window.currentMode ??
+            window.playMode ??
+            window.game?.mode ??
+            window.gameState?.mode ??
+            window.settings?.mode;
+
+        if (typeof mode === "string") {
+            return mode.toLowerCase() === "bowl";
+        }
+
+        // Sicurezza: non cuocere se la modalità non è verificabile.
+        return false;
     }
-
-    
-function isBowlMode() {
-    const bowlButton = document.getElementById("button-bowl");
-    const stackButton = document.getElementById("button-stack");
-
-    // Metodo usato dalla versione attuale di Infinite Chef
-    if (bowlButton) {
-        return bowlButton.hasAttribute("selected");
-    }
-
-    // Fallback per eventuali versioni differenti
-    const mode =
-        window.mode ??
-        window.gameMode ??
-        window.currentMode ??
-        window.playMode ??
-        window.game?.mode ??
-        window.gameState?.mode ??
-        window.settings?.mode;
-
-    if (typeof mode === "string") {
-        return mode.toLowerCase() === "bowl";
-    }
-
-    return false;
-}
 
     // --------------------------------------------------
     // IDENTIFICAZIONE DEGLI INGREDIENTI
@@ -146,7 +166,9 @@ function isBowlMode() {
             return placed;
         }
 
-        if (!placed || typeof placed !== "object") return null;
+        if (!placed || typeof placed !== "object") {
+            return null;
+        }
 
         const candidates = [
             placed.id,
@@ -159,7 +181,10 @@ function isBowlMode() {
         ];
 
         for (const candidate of candidates) {
-            if (typeof candidate === "string" && ingredients[candidate]) {
+            if (
+                typeof candidate === "string" &&
+                ingredients[candidate]
+            ) {
                 return candidate;
             }
 
@@ -174,14 +199,19 @@ function isBowlMode() {
         }
 
         for (const [id, definition] of Object.entries(ingredients)) {
-            if (definition === placed) return id;
+            if (definition === placed) {
+                return id;
+            }
         }
 
         return null;
     }
 
     function isSauce(id) {
+        if (typeof id !== "string") return false;
+
         const def = ingredients[id];
+
         return !!(
             def &&
             (
@@ -194,19 +224,28 @@ function isBowlMode() {
         );
     }
 
+    // --------------------------------------------------
+    // COLORI
+    // --------------------------------------------------
+
     function getColor(value) {
         if (typeof value === "number" && Number.isFinite(value)) {
             return "#" + Math.max(0, Math.min(0xFFFFFF, value))
-                .toString(16).padStart(6, "0");
+                .toString(16)
+                .padStart(6, "0");
         }
 
         if (typeof value !== "string") return null;
 
-        if (/^#[0-9a-f]{6}$/i.test(value)) return value;
+        if (/^#[0-9a-f]{6}$/i.test(value)) {
+            return value;
+        }
 
         if (/^#[0-9a-f]{3}$/i.test(value)) {
-            return "#" + value.slice(1).split("")
-                .map(c => c + c).join("");
+            return "#" + value.slice(1)
+                .split("")
+                .map(c => c + c)
+                .join("");
         }
 
         return null;
@@ -222,18 +261,20 @@ function isBowlMode() {
 
         return "#" + [r, g, b]
             .map(v => Math.round(v * factor)
-                .toString(16).padStart(2, "0"))
+                .toString(16)
+                .padStart(2, "0"))
             .join("");
     }
 
-    function sauceProfile(sauceId) {
-        if (profiles[sauceId]) return profiles[sauceId];
+    // --------------------------------------------------
+    // PROFILO DI COTTURA DELLA SALSA
+    // --------------------------------------------------
 
-        /*
-         * La firma completa dell'ID è la chiave univoca del profilo.
-         * Il numero hash viene usato per le caratteristiche numeriche,
-         * ma non è usato come identificatore del profilo.
-         */
+    function sauceProfile(sauceId) {
+        if (profiles[sauceId]) {
+            return profiles[sauceId];
+        }
+
         let hash = 2166136261;
 
         for (let i = 0; i < sauceId.length; i++) {
@@ -244,10 +285,13 @@ function isBowlMode() {
         hash >>>= 0;
 
         const chars = Array.from(sauceId)
-            .reduce((sum, char) => sum + char.codePointAt(0), 0);
+            .reduce(
+                (sum, char) => sum + char.codePointAt(0),
+                0
+            );
 
         const profile = {
-            sauceId: sauceId,
+            sauceId,
             signature: sauceId,
             heatFactor: 0.65 + (hash % 71) / 100,
             browning: 0.48 + ((hash >>> 8) % 45) / 100,
@@ -269,77 +313,103 @@ function isBowlMode() {
 
     function makeButton(label, callback) {
         const button = document.createElement("button");
+
         button.type = "button";
         button.textContent = label;
+
         button.style.cssText =
-            "padding:8px 11px;margin:4px;border:0;border-radius:7px;" +
-            "background:#a65332;color:white;cursor:pointer;";
+            "padding:8px 11px;margin:4px;border:0;" +
+            "border-radius:7px;background:#a65332;" +
+            "color:white;cursor:pointer;";
+
         button.addEventListener("click", callback);
+
         return button;
     }
 
-function renderSauces() {
-    if (!sauceSelect) return;
+    // --------------------------------------------------
+    // AGGIORNAMENTO ELENCO SALSE
+    // --------------------------------------------------
 
-    const currentIngredients = window.ingredients || {};
-    const sauceIds = Object.keys(currentIngredients)
-        .filter(id => {
-            const def = currentIngredients[id];
+    function renderSauces() {
+        if (!sauceSelect) return;
 
-            return !!(
-                def &&
-                (
-                    def.sauceMaker === true ||
+        /*
+         * Legge il database corrente a ogni aggiornamento,
+         * anziché affidarsi a una lista salvata in precedenza.
+         */
+        const currentIngredients = window.ingredients || {};
+
+        const sauceIds = Object.keys(currentIngredients)
+            .filter(id => {
+                const def = currentIngredients[id];
+
+                return !!(
+                    def &&
                     (
-                        id.startsWith("sauce_") &&
-                        Array.isArray(def.sauceIngredients)
+                        def.sauceMaker === true ||
+                        (
+                            id.startsWith("sauce_") &&
+                            Array.isArray(def.sauceIngredients)
+                        )
                     )
-                )
-            );
-        })
-        .sort();
+                );
+            })
+            .sort();
 
-    const previousSelection = selectedSauce;
+        const previousSelection = selectedSauce;
 
-    sauceSelect.replaceChildren();
+        sauceSelect.replaceChildren();
 
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "-- Scegli una salsa --";
-    sauceSelect.appendChild(placeholder);
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "-- Scegli una salsa --";
 
-    for (const id of sauceIds) {
-        const option = document.createElement("option");
-        option.value = id;
-        option.textContent = id;
-        sauceSelect.appendChild(option);
+        sauceSelect.appendChild(placeholder);
+
+        for (const id of sauceIds) {
+            const option = document.createElement("option");
+
+            option.value = id;
+            option.textContent = id;
+
+            sauceSelect.appendChild(option);
+        }
+
+        if (
+            previousSelection &&
+            sauceIds.includes(previousSelection)
+        ) {
+            sauceSelect.value = previousSelection;
+        } else {
+            sauceSelect.value = "";
+            selectedSauce = null;
+        }
+
+        console.log(
+            "[SauceFryer] Elenco aggiornato:",
+            sauceIds.length,
+            "salse",
+            sauceIds
+        );
     }
 
-    if (previousSelection && sauceIds.includes(previousSelection)) {
-        sauceSelect.value = previousSelection;
-    } else {
-        sauceSelect.value = "";
-        selectedSauce = null;
-    }
-
-    console.log(
-        "[SauceFryer] Elenco aggiornato:",
-        sauceIds.length,
-        "salse",
-        sauceIds
-    );
-}
+    // --------------------------------------------------
+    // ELENCO INGREDIENTI FRITTI
+    // --------------------------------------------------
 
     function renderDatabase() {
         if (!panel) return;
 
         const list = panel.querySelector("#" + PREFIX + "-list");
+
         if (!list) return;
 
         list.replaceChildren();
 
         database.forEach(item => {
             const row = document.createElement("div");
+
             row.style.cssText =
                 "padding:8px;margin:5px 0;background:#30231f;" +
                 "border-radius:6px;overflow-wrap:anywhere;";
@@ -348,13 +418,17 @@ function renderSauces() {
             title.textContent = item.id;
 
             const swatch = document.createElement("span");
+
             swatch.style.cssText =
                 "display:inline-block;width:12px;height:12px;" +
                 "border-radius:50%;margin-left:8px;background:" +
                 (getColor(item.color) || "#654321");
 
             const details = document.createElement("div");
-            details.style.cssText = "font-size:12px;color:#ddd;";
+
+            details.style.cssText =
+                "font-size:12px;color:#ddd;";
+
             details.textContent =
                 "Salsa: " + item.sauceId +
                 " | Ingrediente originale: " + item.originalId;
@@ -364,17 +438,23 @@ function renderSauces() {
         });
     }
 
+    // --------------------------------------------------
+    // CREAZIONE PANNELLO
+    // --------------------------------------------------
+
     function createPanel() {
         if (panel) return;
 
         panel = document.createElement("div");
         panel.id = PREFIX + "-panel";
+
         panel.style.cssText =
             "position:fixed;right:14px;bottom:120px;width:350px;" +
-            "max-width:calc(100vw - 28px);max-height:65vh;overflow:auto;" +
-            "z-index:999999;background:#211a18;color:#fff;" +
-            "border:2px solid #a65332;border-radius:12px;padding:12px;" +
-            "font:14px Arial,sans-serif;box-shadow:0 5px 25px #0009;";
+            "max-width:calc(100vw - 28px);max-height:65vh;" +
+            "overflow:auto;z-index:999999;background:#211a18;" +
+            "color:#fff;border:2px solid #a65332;" +
+            "border-radius:12px;padding:12px;font:14px Arial,sans-serif;" +
+            "box-shadow:0 5px 25px #0009;";
 
         const title = document.createElement("h3");
         title.textContent = "🍳 SauceFryer — Frittura in salsa";
@@ -385,11 +465,13 @@ function renderSauces() {
             "sull'ingrediente da cuocere.";
 
         sauceSelect = document.createElement("select");
+
         sauceSelect.style.cssText =
             "box-sizing:border-box;width:100%;padding:9px;margin:5px 0;";
 
         sauceSelect.addEventListener("change", () => {
             selectedSauce = sauceSelect.value || null;
+
             status(
                 selectedSauce
                     ? "Salsa selezionata: " + selectedSauce
@@ -399,6 +481,7 @@ function renderSauces() {
 
         heatButton = makeButton("🔥 Calore: SPENTO", () => {
             heatEnabled = !heatEnabled;
+
             heatButton.textContent = heatEnabled
                 ? "🔥 Calore: ATTIVO"
                 : "🔥 Calore: SPENTO";
@@ -407,12 +490,15 @@ function renderSauces() {
                 ? "#b52e22"
                 : "#66534d";
 
-            status(heatEnabled
-                ? "Calore attivo. Seleziona l'ingrediente con il tool."
-                : "Calore disattivato.");
+            status(
+                heatEnabled
+                    ? "Calore attivo. Seleziona l'ingrediente con il tool."
+                    : "Calore disattivato."
+            );
         });
 
         statusElement = document.createElement("div");
+
         statusElement.style.cssText =
             "padding:8px 0;color:#ffd4ad;font-size:12px;";
 
@@ -422,33 +508,41 @@ function renderSauces() {
         const list = document.createElement("div");
         list.id = PREFIX + "-list";
 
-        const clearPanelButton = makeButton("🧹 Pulisci pannello", () => {
-    if (!panel) return;
+        /*
+         * Pulisce soltanto la lista visualizzata.
+         * Non elimina i record salvati né gli ingredienti del gioco.
+         */
+        const clearPanelButton = makeButton(
+            "🧹 Pulisci pannello",
+            () => {
+                const visibleList = panel?.querySelector(
+                    "#" + PREFIX + "-list"
+                );
 
-    // Pulisce soltanto l'elenco visibile nel pannello.
-    const list = panel.querySelector("#" + PREFIX + "-list");
+                if (visibleList) {
+                    visibleList.replaceChildren();
+                }
 
-    if (list) {
-        list.replaceChildren();
-    }
-
-    status("Pannello pulito. I dati salvati non sono stati cancellati.");
-});
+                status(
+                    "Elenco visibile pulito. I dati salvati non sono stati cancellati."
+                );
+            }
+        );
 
         panel.append(
-    title,
-    explanation,
-    sauceSelect,
-    heatButton,
-    statusElement,
-    dbTitle,
-    list,
-    makeButton("Aggiorna elenco salse", renderSauces),
-    clearPanelButton,
-    makeButton("Chiudi", () => {
-        panel.style.display = "none";
-    })
-);
+            title,
+            explanation,
+            sauceSelect,
+            heatButton,
+            statusElement,
+            dbTitle,
+            list,
+            makeButton("Aggiorna elenco salse", renderSauces),
+            clearPanelButton,
+            makeButton("Chiudi", () => {
+                panel.style.display = "none";
+            })
+        );
 
         document.body.appendChild(panel);
 
@@ -461,10 +555,23 @@ function renderSauces() {
     // --------------------------------------------------
 
     function fry(placed) {
+        /*
+         * Ignora i richiami ripetuti sullo stesso oggetto.
+         * Il controllo è eseguito prima di qualsiasi modifica.
+         */
+        if (placed && typeof placed === "object") {
+            if (
+                placed.sauceFryerProcessing ||
+                placed.sauceFryerDone ||
+                processedObjects.has(placed)
+            ) {
+                return;
+            }
+        }
+
         if (!isBowlMode()) {
             status(
-                "Cottura annullata: Bowl Mode non riconosciuto. " +
-                "Verifica il rilevamento della modalità per la tua versione."
+                "Cottura annullata: operazione consentita solo in Bowl Mode."
             );
             return;
         }
@@ -491,12 +598,8 @@ function renderSauces() {
             return;
         }
 
-        if (placed && typeof placed === "object" &&
-            placed.sauceFryerProcessing) {
-            return;
-        }
-
         if (placed && typeof placed === "object") {
+            processedObjects.add(placed);
             placed.sauceFryerProcessing = true;
         }
 
@@ -505,11 +608,6 @@ function renderSauces() {
             const sauce = ingredients[selectedSauce];
             const profile = sauceProfile(selectedSauce);
 
-            /*
-             * Il nome della salsa è incluso nell'ID.
-             * Salse diverse producono ID diversi anche quando
-             * vengono usate sullo stesso ingrediente.
-             */
             const resultId = (
                 originalId + "_fried_in_" + selectedSauce
             ).replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -522,19 +620,27 @@ function renderSauces() {
 
             const colorFactor = Math.max(
                 0.25,
-                Math.min(0.72, 0.72 - profile.browning * 0.35)
+                Math.min(
+                    0.72,
+                    0.72 - profile.browning * 0.35
+                )
             );
 
-            const cookedColor = darkenColor(baseColor, colorFactor);
+            const cookedColor = darkenColor(
+                baseColor,
+                colorFactor
+            );
 
             const definition = {
                 name: resultId,
                 type: original.type || "food",
                 color: cookedColor,
+
                 innerColor: darkenColor(
                     getColor(original.innerColor) || baseColor,
                     Math.max(0.25, colorFactor - 0.12)
                 ),
+
                 reactions: {},
 
                 sauceFried: true,
@@ -565,32 +671,50 @@ function renderSauces() {
                 }
             };
 
-            // Conserva le proprietà visuali originali non sostituite.
+            // Conserva le proprietà visuali originali.
             [
-                "shape", "width", "height", "size", "texture",
-                "emoji", "image", "h", "s", "l"
+                "shape",
+                "width",
+                "height",
+                "size",
+                "texture",
+                "emoji",
+                "image",
+                "h",
+                "s",
+                "l"
             ].forEach(key => {
                 if (original[key] !== undefined) {
                     definition[key] = original[key];
                 }
+
                 if (placed && placed[key] !== undefined) {
                     definition[key] = placed[key];
                 }
             });
 
+            /*
+             * Registra l'ingrediente nel database generale.
+             */
             if (!ingredients[resultId]) {
                 addIngredient(resultId, definition);
             }
 
             if (!ingredients[resultId]) {
-                throw new Error("addIngredient non ha registrato " + resultId);
+                throw new Error(
+                    "addIngredient non ha registrato " + resultId
+                );
             }
 
             Object.assign(ingredients[resultId], definition);
 
-            // Se il gioco fornisce un oggetto piazzato, trasformalo.
+            /*
+             * Trasforma l'oggetto piazzato e lo contrassegna come cotto,
+             * così le chiamate successive non lo cuociono nuovamente.
+             */
             if (placed && typeof placed === "object") {
                 Object.assign(placed, definition);
+
                 placed.id = resultId;
                 placed.name = resultId;
                 placed.color = cookedColor;
@@ -601,7 +725,7 @@ function renderSauces() {
 
             const record = {
                 id: resultId,
-                originalId: originalId,
+                originalId,
                 sauceId: selectedSauce,
                 color: cookedColor,
                 profileSignature: profile.signature,
@@ -614,26 +738,48 @@ function renderSauces() {
                 item => item.id === resultId
             );
 
-            if (index >= 0) database[index] = record;
-            else database.unshift(record);
+            if (index >= 0) {
+                database[index] = record;
+            } else {
+                database.unshift(record);
+            }
 
             saveDatabase();
             renderDatabase();
 
-            status("Cottura riuscita: " + resultId);
-            console.log("[SauceFryer] Nuovo ingrediente:", definition);
+            /*
+             * Il messaggio di successo viene stampato una sola volta
+             * per ciascun ID di risultato durante questa sessione.
+             */
+            if (!loggedResults.has(resultId)) {
+                loggedResults.add(resultId);
+
+                status("Cottura riuscita: " + resultId);
+
+                console.log(
+                    "[SauceFryer] Nuovo ingrediente:",
+                    definition
+                );
+            }
         } catch (error) {
             if (placed && typeof placed === "object") {
                 placed.sauceFryerProcessing = false;
+                processedObjects.delete(placed);
             }
 
-            console.error("[SauceFryer] Errore durante la cottura:", error);
-            status("Errore durante la cottura: " + error.message);
+            console.error(
+                "[SauceFryer] Errore durante la cottura:",
+                error
+            );
+
+            status(
+                "Errore durante la cottura: " + error.message
+            );
         }
     }
 
     // --------------------------------------------------
-    // TOOL DI GIOCO
+    // REGISTRAZIONE TOOL
     // --------------------------------------------------
 
     window.addTool("sauce_fryer", {
@@ -644,7 +790,9 @@ function renderSauces() {
 
         onSelect: function () {
             createPanel();
+
             panel.style.display = "block";
+
             renderSauces();
 
             status(
@@ -660,11 +808,16 @@ function renderSauces() {
                 return;
             }
 
-            // Permette di scegliere la salsa cliccandola con il tool.
+            /*
+             * È possibile selezionare la salsa cliccandola direttamente
+             * con il tool, senza cuocerla.
+             */
             if (id && isSauce(id)) {
                 selectedSauce = id;
 
-                if (sauceSelect) sauceSelect.value = id;
+                if (sauceSelect) {
+                    sauceSelect.value = id;
+                }
 
                 status("Mezzo di cottura selezionato: " + id);
                 return;
@@ -674,6 +827,10 @@ function renderSauces() {
         }
     });
 
+    // --------------------------------------------------
+    // INIZIALIZZAZIONE
+    // --------------------------------------------------
+
     function initialize() {
         createPanel();
 
@@ -682,29 +839,38 @@ function renderSauces() {
                 "🍳 SauceFryer",
                 () => {
                     createPanel();
+
                     panel.style.display =
-                        panel.style.display === "none" ? "block" : "none";
+                        panel.style.display === "none"
+                            ? "block"
+                            : "none";
+
                     renderSauces();
                     renderDatabase();
                 }
             );
 
             launcher.id = PREFIX + "-launcher";
+
             launcher.style.cssText +=
                 "position:fixed;right:14px;bottom:14px;" +
-                "z-index:999999;padding:11px;border:2px solid #d98b67;";
+                "z-index:999999;padding:11px;" +
+                "border:2px solid #d98b67;";
 
             document.body.appendChild(launcher);
         }
 
         console.log("[SauceFryer] Caricato.");
+
         status("Pronto. Seleziona una salsa per iniziare.");
     }
 
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", initialize, {
-            once: true
-        });
+        document.addEventListener(
+            "DOMContentLoaded",
+            initialize,
+            { once: true }
+        );
     } else {
         initialize();
     }
