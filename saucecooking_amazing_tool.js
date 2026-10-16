@@ -28,7 +28,37 @@
         return;
     }
 
-    const ingredients = window.ingredients;
+    Object.defineProperty(window, "__sauceFryerIngredients", {
+    configurable: true,
+    get() {
+        return window.ingredients;
+    }
+});
+
+const ingredients = new Proxy({}, {
+    get(_target, prop) {
+        return window.ingredients?.[prop];
+    },
+    set(_target, prop, value) {
+        window.ingredients[prop] = value;
+        return true;
+    },
+    ownKeys() {
+        return Reflect.ownKeys(window.ingredients || {});
+    },
+    getOwnPropertyDescriptor(_target, prop) {
+        const descriptor = Object.getOwnPropertyDescriptor(
+            window.ingredients || {},
+            prop
+        );
+        return descriptor
+            ? { ...descriptor, configurable: true }
+            : undefined;
+    },
+    has(_target, prop) {
+        return prop in (window.ingredients || {});
+    }
+});
 
     let selectedSauce = null;
     let heatEnabled = false;
@@ -248,30 +278,57 @@ function isBowlMode() {
         return button;
     }
 
-    function renderSauces() {
-        if (!sauceSelect) return;
+function renderSauces() {
+    if (!sauceSelect) return;
 
-        sauceSelect.replaceChildren();
+    const currentIngredients = window.ingredients || {};
+    const sauceIds = Object.keys(currentIngredients)
+        .filter(id => {
+            const def = currentIngredients[id];
 
-        const placeholder = document.createElement("option");
-        placeholder.value = "";
-        placeholder.textContent = "-- Scegli una salsa --";
-        sauceSelect.appendChild(placeholder);
+            return !!(
+                def &&
+                (
+                    def.sauceMaker === true ||
+                    (
+                        id.startsWith("sauce_") &&
+                        Array.isArray(def.sauceIngredients)
+                    )
+                )
+            );
+        })
+        .sort();
 
-        Object.keys(ingredients)
-            .filter(isSauce)
-            .sort()
-            .forEach(id => {
-                const option = document.createElement("option");
-                option.value = id;
-                option.textContent = id;
-                sauceSelect.appendChild(option);
-            });
+    const previousSelection = selectedSauce;
 
-        if (selectedSauce && ingredients[selectedSauce]) {
-            sauceSelect.value = selectedSauce;
-        }
+    sauceSelect.replaceChildren();
+
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "-- Scegli una salsa --";
+    sauceSelect.appendChild(placeholder);
+
+    for (const id of sauceIds) {
+        const option = document.createElement("option");
+        option.value = id;
+        option.textContent = id;
+        sauceSelect.appendChild(option);
     }
+
+    if (previousSelection && sauceIds.includes(previousSelection)) {
+        sauceSelect.value = previousSelection;
+    } else {
+        sauceSelect.value = "";
+        selectedSauce = null;
+    }
+
+    console.log(
+        "[SauceFryer] Elenco aggiornato:",
+        sauceIds.length,
+        "salse",
+        sauceIds
+    );
+}
 
     function renderDatabase() {
         if (!panel) return;
