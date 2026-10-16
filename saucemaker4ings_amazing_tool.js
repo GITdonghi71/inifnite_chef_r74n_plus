@@ -353,37 +353,35 @@ function createSauceName(id) {
         return rgb.map(v => Math.round((v + m) * 255));
     }
 
-    function createSauceColor(ids) {
-        const seed = hash(combinationKey(ids));
-        const hue = seed % 360;
-        const saturation = 68 + ((seed >>> 9) % 22);
-        const lightness = 42 + ((seed >>> 17) % 15);
 
-        let rgb = hslToRgb(hue, saturation, lightness);
+function createSauceColor(ids) {
+    const sourceColors = ids
+        .map(id => ingredientColor(id))
+        .filter(color => Array.isArray(color) && color.length >= 3);
 
-        const sourceColors = ids.map(ingredientColor).filter(Boolean);
-
-        if (sourceColors.length > 0) {
-            const average = [0, 1, 2].map(channel =>
-                sourceColors.reduce(
-                    (sum, color) => sum + color[channel], 0
-                ) / sourceColors.length
+    // Se almeno un ingrediente ha un colore valido,
+    // calcola la media RGB dei colori disponibili.
+    if (sourceColors.length > 0) {
+        const average = [0, 1, 2].map(channel => {
+            const total = sourceColors.reduce(
+                (sum, color) => sum + color[channel],
+                0
             );
 
-            rgb = rgb.map((channel, i) =>
-                Math.round(channel * 0.72 + average[i] * 0.28)
-            );
-        }
+            return Math.round(total / sourceColors.length);
+        });
 
-        const max = Math.max(...rgb);
-        const min = Math.min(...rgb);
-
-        if (max - min < 45 || max < 85) {
-            rgb = hslToRgb(hue, Math.max(75, saturation), 49);
-        }
-
-        return rgbToHex(rgb);
+        return rgbToHex(average);
     }
+
+    // Fallback deterministico se nessun ingrediente
+    // possiede un colore riconoscibile.
+    const seed = hash(combinationKey(ids));
+    const hue = seed % 360;
+
+    return rgbToHex(hslToRgb(hue, 45, 55));
+}
+
 
     // ---------------- NUTRIENTI ----------------
 
