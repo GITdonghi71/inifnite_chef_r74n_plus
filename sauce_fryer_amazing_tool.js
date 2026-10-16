@@ -80,53 +80,32 @@
             .trim();
     }
 
-    function isBowlMode() {
-        const candidates = [
-            window.mode,
-            window.gameMode,
-            window.currentMode,
-            window.playMode,
-            window.game && window.game.mode,
-            window.gameState && window.gameState.mode,
-            window.settings && window.settings.mode
-        ];
+    
+function isBowlMode() {
+    const bowlButton = document.getElementById("button-bowl");
+    const stackButton = document.getElementById("button-stack");
 
-        for (const value of candidates) {
-            if (typeof value !== "string") continue;
-
-            const mode = normalize(value);
-
-            if (
-                mode === "bowl" ||
-                mode === "bowl mode" ||
-                mode === "bowl_mode"
-            ) return true;
-
-            if (
-                mode === "stack" ||
-                mode === "stack mode" ||
-                mode === "stack_mode"
-            ) return false;
-        }
-
-        // Alcune versioni espongono il selettore della modalità nel DOM.
-        const active = document.querySelector(
-            '[aria-pressed="true"], [aria-selected="true"], ' +
-            '.selected, .active, [data-mode]'
-        );
-
-        if (active) {
-            const text = normalize(
-                (active.textContent || "") + " " +
-                (active.getAttribute("data-mode") || "")
-            );
-
-            if (/\bbowl(?: mode)?\b/.test(text)) return true;
-            if (/\bstack(?: mode)?\b/.test(text)) return false;
-        }
-
-        return false;
+    // Metodo usato dalla versione attuale di Infinite Chef
+    if (bowlButton) {
+        return bowlButton.hasAttribute("selected");
     }
+
+    // Fallback per eventuali versioni differenti
+    const mode =
+        window.mode ??
+        window.gameMode ??
+        window.currentMode ??
+        window.playMode ??
+        window.game?.mode ??
+        window.gameState?.mode ??
+        window.settings?.mode;
+
+    if (typeof mode === "string") {
+        return mode.toLowerCase() === "bowl";
+    }
+
+    return false;
+}
 
     // --------------------------------------------------
     // IDENTIFICAZIONE DEGLI INGREDIENTI
