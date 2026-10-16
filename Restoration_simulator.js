@@ -3,15 +3,12 @@
  * restoration_simulator.js
  * Infinite Chef R74n Plus
  *
- * Simulatore di ristorazione:
  * - 3 giornate, 2 piatti per giornata
- * - 6 ricette per ciclo
- * - Valutazione gourmet, complessità, estetica,
- *   sapori e combinazioni
- * - Ricavi, costi ingredienti, costi tool e utile netto
+ * - 6 ricette diverse, assegnate manualmente
+ * - Spunta verde per confermare ogni slot
+ * - Valutazione gourmet, complessità, estetica, sapori e combinazioni
+ * - Ricavi, costi e utile netto
  * - Capitale progressivo salvato localmente
- *
- * I prezzi sono stime simulate e configurabili.
  */
 
 (function () {
@@ -19,24 +16,24 @@
 
     const MOD_ID = "restoration-simulator";
     const STORAGE_KEY = "restoration_simulator_save_v1";
-
-    if (document.getElementById(MOD_ID + "-panel")) return;
-
     const DAYS = 3;
     const DISHES_PER_DAY = 2;
+    const SLOT_COUNT = DAYS * DISHES_PER_DAY;
     const INITIAL_CAPITAL = 1000;
+
+    if (document.getElementById(MOD_ID + "-panel")) return;
 
     const state = {
         capital: INITIAL_CAPITAL,
         recipes: [],
-        menu: ["", "", "", "", "", ""],
+        menu: Array(SLOT_COUNT).fill(""),
         reports: [],
         completed: false
     };
 
-    const $ = (selector) => document.querySelector(selector);
+    const $ = selector => document.querySelector(selector);
 
-    const money = (value) =>
+    const money = value =>
         "$" + Number(value || 0).toLocaleString("it-IT", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
@@ -45,7 +42,7 @@
     const clamp = (value, min = 1, max = 10) =>
         Math.max(min, Math.min(max, Number(value) || min));
 
-    const safeText = (value) => String(value ?? "");
+    const safeText = value => String(value ?? "");
 
     function save() {
         try {
@@ -57,24 +54,48 @@
 
     function load() {
         try {
-            const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+            const saved = JSON.parse(
+                localStorage.getItem(STORAGE_KEY) || "null"
+            );
 
-            if (!saved) return;
+            if (!saved || typeof saved !== "object") return;
 
             state.capital = Number(saved.capital) || INITIAL_CAPITAL;
-            state.recipes = Array.isArray(saved.recipes) ? saved.recipes : [];
-            state.menu = Array.isArray(saved.menu) ? saved.menu : state.menu;
-            state.reports = Array.isArray(saved.reports) ? saved.reports : [];
+            state.recipes = Array.isArray(saved.recipes)
+                ? saved.recipes : [];
+
+            state.menu = Array.isArray(saved.menu)
+                ? saved.menu.slice(0, SLOT_COUNT) : Array(SLOT_COUNT).fill("");
+
+            while (state.menu.length < SLOT_COUNT) {
+                state.menu.push("");
+            }
+
+            state.reports = Array.isArray(saved.reports)
+                ? saved.reports : [];
+
             state.completed = Boolean(saved.completed);
-        } catch (_) {
-            console.warn("[Restoration Simulator] Salvataggio non valido.");
+
+            // Elimina selezioni duplicate o ricette mancanti.
+            const seen = new Set();
+
+            state.menu = state.menu.map(id => {
+                if (
+                    !id ||
+                    !state.recipes.some(recipe => recipe.id === id) ||
+                    seen.has(id)
+                ) {
+                    return "";
+                }
+
+                seen.add(id);
+                return id;
+            });
+        } catch (error) {
+            console.warn("[Restoration Simulator] Salvataggio non valido.", error);
         }
     }
 
-    /*
-     * Scoperta best-effort degli ingredienti.
-     * Le strutture interne di R74n possono variare tra versioni.
-     */
     function discoverIngredients() {
         const sources = [
             window.ingredients,
@@ -99,7 +120,9 @@
                     item.description
                 ].join(" ").toLowerCase();
 
-                if (/food|ingredient|fruit|vegetable|meat|fish|spice|sauce|dessert|bread|cheese|rice|pasta|food|frutta|verdura|carne|pesce|salsa|dolce|pane|formaggio|riso/.test(description)) {
+                if (
+                    /food|ingredient|fruit|vegetable|meat|fish|spice|sauce|dessert|bread|cheese|rice|pasta|frutta|verdura|carne|pesce|salsa|dolce|pane|formaggio|riso/.test(description)
+                ) {
                     ids.add(id);
                 }
             }
@@ -137,12 +160,15 @@
                 let ingredients = [];
 
                 if (typeof item === "object") {
-                    const raw = item.ingredients || item.input || item.inputs || [];
+                    const raw =
+                        item.ingredients || item.input || item.inputs || [];
 
                     ingredients = Array.isArray(raw)
                         ? raw.map(String)
                         : typeof raw === "string"
-                            ? raw.split(/[+,]/).map(x => x.trim()).filter(Boolean)
+                            ? raw.split(/[+,]/)
+                                .map(x => x.trim())
+                                .filter(Boolean)
                             : [];
                 }
 
@@ -173,7 +199,8 @@
             /spicy|sweet|sour|smok|umami|herb|spice|agrodolce|piccante|dolce|affumicato|erbe|speziato/;
 
         const complexity = clamp(
-            1 + ingredients.length * 0.7 + tools.length * 0.6 +
+            1 + ingredients.length * 0.7 +
+            tools.length * 0.6 +
             (gourmetWords.test(name) ? 2 : 0)
         );
 
@@ -196,13 +223,12 @@
             2 + Math.max(0, ingredients.length - 1) * 1.1
         );
 
-        const score = (
+        const score =
             complexity * 0.25 +
             gourmet * 0.25 +
             visual * 0.18 +
             flavor * 0.17 +
-            combinations * 0.15
-        );
+            combinations * 0.15;
 
         return {
             complexity,
@@ -219,7 +245,7 @@
 
         if (!name) {
             alert("Inserisci il nome del piatto.");
-            return;
+            return false;
         }
 
         const ingredients = ingredientText
@@ -242,47 +268,39 @@
         };
 
         recipe.metrics = estimateMetrics(recipe);
-
         state.recipes.push(recipe);
 
-        const emptySlot = state.menu.findIndex(value => !value);
-
-        if (emptySlot !== -1) {
-            state.menu[emptySlot] = recipe.id;
-        }
-
+        // Nessuna assegnazione automatica allo slot.
         save();
         render();
-        $("#rs-status").textContent = "Ricetta aggiunta: " + name;
+
+        $("#rs-status").textContent =
+            "Ricetta aggiunta: " + name +
+            ". Seleziona uno slot e premi ✓ Conferma ricetta.";
+
+        return true;
     }
 
-    /*
-     * COSTI
-     *
-     * I costi vengono stimati in modo trasparente:
-     * ingredienti comuni: costo base basso;
-     * ingredienti premium: costo maggiorato;
-     * tool: costo per utilizzo;
-     * complessità: costo aggiuntivo di lavorazione.
-     */
     function calculateCosts(recipe, day) {
         const premiumPattern =
             /truffle|tartufo|wagyu|caviar|caviale|saffron|zafferano|lobster|aragosta|gold|oro/i;
 
-        const ingredientCosts = recipe.ingredients.reduce((total, ingredient) => {
-            const premium = premiumPattern.test(ingredient);
-            const baseCost = 3 + (ingredient.length % 5) * 0.8;
+        const ingredientCosts = recipe.ingredients.reduce(
+            (total, ingredient) => {
+                const premium = premiumPattern.test(ingredient);
+                const baseCost = 3 + (ingredient.length % 5) * 0.8;
 
-            return total + baseCost * (premium ? 5 : 1);
-        }, 0);
+                return total + baseCost * (premium ? 5 : 1);
+            },
+            0
+        );
 
-        const toolCosts = recipe.tools.reduce((total, tool) => {
-            return total + 4 + (tool.length % 4);
-        }, 0);
+        const toolCosts = recipe.tools.reduce(
+            (total, tool) => total + 4 + (tool.length % 4),
+            0
+        );
 
         const laborCosts = recipe.metrics.complexity * 2.5;
-
-        // Simulazione delle variazioni di mercato per ciascuna giornata.
         const marketFactors = [1.00, 1.08, 0.96];
         const market = marketFactors[day - 1] || 1;
 
@@ -309,9 +327,9 @@
         const premiumPattern =
             /gourmet|signature|tartare|souffl[eé]|risotto|truffle|tartufo|wagyu|sashimi|carpaccio|confit|molecular|degustazione|stellato/i;
 
-        const specialMultiplier = premiumPattern.test(recipe.name) ? 1.25 : 1;
+        const multiplier = premiumPattern.test(recipe.name) ? 1.25 : 1;
 
-        return Math.round(base * specialMultiplier * 100) / 100;
+        return Math.round(base * multiplier * 100) / 100;
     }
 
     function getRecipe(id) {
@@ -333,7 +351,12 @@
         );
 
         if (selectedIds.length !== 2 || selectedIds.some(id => !id)) {
-            alert("Seleziona entrambe le ricette del giorno " + day + ".");
+            alert("Conferma entrambe le ricette del giorno " + day + ".");
+            return;
+        }
+
+        if (new Set(selectedIds).size !== 2) {
+            alert("I due piatti della giornata devono essere diversi.");
             return;
         }
 
@@ -349,7 +372,7 @@
         let toolCosts = 0;
         let laborCosts = 0;
 
-        const breakdown = dishes.map((recipe, index) => {
+        const breakdown = dishes.map(recipe => {
             const costs = calculateCosts(recipe, day);
             const gross = calculateRevenue(recipe);
 
@@ -370,22 +393,20 @@
             };
         });
 
-        // Piccolo bonus di armonia per un menu con piatti diversi
-        // e punteggi di qualità simili.
-        if (dishes[0].id !== dishes[1].id) {
-            const difference = Math.abs(
-                dishes[0].metrics.score - dishes[1].metrics.score
-            );
+        // Bonus per due piatti diversi con punteggi simili.
+        const difference = Math.abs(
+            dishes[0].metrics.score - dishes[1].metrics.score
+        );
 
-            revenue += Math.max(0, 5 - difference) * 2;
-        }
+        revenue += Math.max(0, 5 - difference) * 2;
 
-        const totalCosts = ingredientCosts + toolCosts + laborCosts;
+        const totalCosts =
+            ingredientCosts + toolCosts + laborCosts;
+
         const netProfit = revenue - totalCosts;
-
         state.capital += netProfit;
 
-        const report = {
+        state.reports.push({
             day,
             revenue,
             ingredientCosts,
@@ -395,43 +416,41 @@
             netProfit,
             capitalAfter: state.capital,
             dishes: breakdown
-        };
+        });
 
-        state.reports.push(report);
         state.completed = state.reports.length >= DAYS;
 
         save();
         render();
 
         $("#rs-status").textContent =
-            "Giorno " + day + " concluso. Utile netto: " +
-            money(netProfit);
+            "Giorno " + day + " concluso. Utile netto: " + money(netProfit);
     }
 
     function resetService() {
-        if (!confirm("Vuoi iniziare un nuovo ciclo di tre giornate mantenendo il capitale?")) {
-            return;
-        }
+        if (!confirm(
+            "Vuoi iniziare un nuovo ciclo di tre giornate mantenendo il capitale?"
+        )) return;
 
         state.reports = [];
-        state.menu = ["", "", "", "", "", ""];
+        state.menu = Array(SLOT_COUNT).fill("");
         state.completed = false;
 
         save();
         render();
 
         $("#rs-status").textContent =
-            "Nuovo ciclo pronto. Seleziona le sei ricette.";
+            "Nuovo ciclo pronto. Assegna sei ricette diverse con ✓.";
     }
 
     function resetEverything() {
-        if (!confirm("Vuoi azzerare il capitale e tutti i risultati?")) {
-            return;
-        }
+        if (!confirm(
+            "Vuoi azzerare il capitale e tutti i risultati?"
+        )) return;
 
         state.capital = INITIAL_CAPITAL;
         state.reports = [];
-        state.menu = ["", "", "", "", "", ""];
+        state.menu = Array(SLOT_COUNT).fill("");
         state.completed = false;
 
         save();
@@ -454,6 +473,7 @@
         if (!$("#rs-capital")) return;
 
         $("#rs-capital").textContent = money(state.capital);
+
         $("#rs-day").textContent = state.completed
             ? "Ciclo completato"
             : "Giorno " + (state.reports.length + 1) + " / 3";
@@ -462,35 +482,55 @@
 
         slots.innerHTML = state.menu.map((id, index) => {
             const recipe = getRecipe(id);
-            const day = Math.floor(index / 2) + 1;
-            const dishNumber = index % 2 + 1;
+            const day = Math.floor(index / DISHES_PER_DAY) + 1;
+            const dishNumber = index % DISHES_PER_DAY + 1;
 
-            const options = state.recipes.map(item =>
-                `<option value="${escapeHTML(item.id)}" ${
-                    item.id === id ? "selected" : ""
-                }>${escapeHTML(item.name)}</option>`
-            ).join("");
+            const options = state.recipes.map(item => {
+                const usedElsewhere = state.menu.some(
+                    (selectedId, slotIndex) =>
+                        selectedId === item.id && slotIndex !== index
+                );
 
-            let details = '<p class="rs-muted">Scegli una ricetta.</p>';
+                return `
+                    <option
+                        value="${escapeHTML(item.id)}"
+                        ${item.id === id ? "selected" : ""}
+                        ${usedElsewhere ? "disabled" : ""}
+                    >${escapeHTML(item.name)}</option>
+                `;
+            }).join("");
+
+            let details = `
+                <p class="rs-muted">
+                    Scegli una ricetta e premi la spunta verde per assegnarla.
+                </p>
+            `;
 
             if (recipe) {
                 const m = recipe.metrics;
                 const costs = calculateCosts(recipe, day);
 
                 details = `
+                    <div class="rs-confirmed">✓ Ricetta confermata</div>
+
                     <div class="rs-metrics">
-                        <span>Complessità <b>${m.complexity.toFixed(1)}</b></span>
-                        <span>Gourmet <b>${m.gourmet.toFixed(1)}</b></span>
-                        <span>Estetica <b>${m.visual.toFixed(1)}</b></span>
-                        <span>Sapori <b>${m.flavor.toFixed(1)}</b></span>
-                        <span>Combo <b>${m.combinations.toFixed(1)}</b></span>
+                        <span>Complessità<b>${m.complexity.toFixed(1)}</b></span>
+                        <span>Gourmet<b>${m.gourmet.toFixed(1)}</b></span>
+                        <span>Estetica<b>${m.visual.toFixed(1)}</b></span>
+                        <span>Sapori<b>${m.flavor.toFixed(1)}</b></span>
+                        <span>Combo<b>${m.combinations.toFixed(1)}</b></span>
                     </div>
+
                     <p class="rs-muted">
-                        Ingredienti: ${escapeHTML(recipe.ingredients.join(", ") || "non specificati")}
+                        Ingredienti:
+                        ${escapeHTML(recipe.ingredients.join(", ") || "non specificati")}
                     </p>
+
                     <p class="rs-muted">
-                        Tool: ${escapeHTML(recipe.tools.join(", ") || "nessuno specificato")}
+                        Tool:
+                        ${escapeHTML(recipe.tools.join(", ") || "nessuno specificato")}
                     </p>
+
                     <p>Ricavo stimato: <b>${money(calculateRevenue(recipe))}</b></p>
                     <p>Costo stimato: <b>${money(costs.total)}</b></p>
                 `;
@@ -499,24 +539,87 @@
             return `
                 <section class="rs-card">
                     <h3>Giorno ${day} · Piatto ${dishNumber}</h3>
-                    <select data-slot="${index}">
+
+                    <select
+                        data-slot="${index}"
+                        aria-label="Ricetta giorno ${day}, piatto ${dishNumber}"
+                    >
                         <option value="">— Seleziona piatto —</option>
                         ${options}
                     </select>
+
+                    <button
+                        type="button"
+                        class="rs-confirm"
+                        data-confirm-slot="${index}"
+                    >✓ Conferma ricetta</button>
+
                     ${details}
                 </section>
             `;
         }).join("");
 
+        // La selezione nel menu è provvisoria finché non si preme la spunta.
         slots.querySelectorAll("select[data-slot]").forEach(select => {
             select.addEventListener("change", () => {
-                state.menu[Number(select.dataset.slot)] = select.value;
-                save();
-                render();
+                $("#rs-status").textContent =
+                    "Selezione provvisoria: premi ✓ Conferma ricetta per salvare lo slot.";
             });
         });
 
-        $("#rs-run-day").disabled = state.completed;
+        slots.querySelectorAll("button[data-confirm-slot]").forEach(button => {
+            button.addEventListener("click", () => {
+                const slotIndex = Number(button.dataset.confirmSlot);
+                const select = slots.querySelector(
+                    `select[data-slot="${slotIndex}"]`
+                );
+
+                const selectedId = select ? select.value : "";
+
+                if (!selectedId) {
+                    $("#rs-status").textContent =
+                        "Seleziona una ricetta prima di confermare.";
+                    return;
+                }
+
+                const duplicate = state.menu.some(
+                    (id, index) =>
+                        index !== slotIndex && id === selectedId
+                );
+
+                if (duplicate) {
+                    $("#rs-status").textContent =
+                        "Questa ricetta è già confermata in un altro slot. Scegline un'altra.";
+                    return;
+                }
+
+                state.menu[slotIndex] = selectedId;
+
+                save();
+                render();
+
+                $("#rs-status").textContent =
+                    "✅ Ricetta confermata: giorno " +
+                    (Math.floor(slotIndex / DISHES_PER_DAY) + 1) +
+                    ", piatto " + (slotIndex % DISHES_PER_DAY + 1) + ".";
+            });
+        });
+
+        // Sblocca la simulazione solo quando entrambi i piatti del giorno
+        // corrente sono confermati e diversi.
+        const startIndex = state.reports.length * DISHES_PER_DAY;
+        const currentSlots = state.menu.slice(
+            startIndex,
+            startIndex + DISHES_PER_DAY
+        );
+
+        const validDay =
+            currentSlots.length === DISHES_PER_DAY &&
+            currentSlots.every(Boolean) &&
+            new Set(currentSlots).size === DISHES_PER_DAY;
+
+        $("#rs-run-day").disabled = state.completed || !validDay;
+
         $("#rs-run-day").textContent = state.completed
             ? "Tre giornate completate"
             : "Simula giornata " + (state.reports.length + 1);
@@ -529,16 +632,28 @@
                 <p>Costi tool: ${money(report.toolCosts)}</p>
                 <p>Costi lavorazione: ${money(report.laborCosts)}</p>
                 <p>Costi totali: <b>${money(report.totalCosts)}</b></p>
-                <p>Utile netto: <strong class="${report.netProfit >= 0 ? "positive" : "negative"}">${money(report.netProfit)}</strong></p>
+                <p>
+                    Utile netto:
+                    <strong class="${report.netProfit >= 0 ? "positive" : "negative"}">
+                        ${money(report.netProfit)}
+                    </strong>
+                </p>
                 <p>Capitale dopo il servizio: <b>${money(report.capitalAfter)}</b></p>
                 <ul>
                     ${report.dishes.map(dish => `
-                        <li>${escapeHTML(dish.name)}:
-                        ricavo ${money(dish.gross)}, costo ${money(dish.totalCost)}</li>
+                        <li>
+                            ${escapeHTML(dish.name)}:
+                            ricavo ${money(dish.gross)},
+                            costo ${money(dish.totalCost)}
+                        </li>
                     `).join("")}
                 </ul>
             </section>
-        `).join("") || '<p class="rs-muted">Il bilancio apparirà dopo il primo servizio.</p>';
+        `).join("") || `
+            <p class="rs-muted">
+                Il bilancio apparirà dopo il primo servizio.
+            </p>
+        `;
 
         if (state.completed) {
             const totalProfit = state.reports.reduce(
@@ -548,7 +663,6 @@
 
             $("#rs-summary").innerHTML = `
                 <h3>🏆 Risultato finale</h3>
-                <p>Capitale iniziale: ${money(INITIAL_CAPITAL)}</p>
                 <p>Utile complessivo del ciclo: <b>${money(totalProfit)}</b></p>
                 <p>Capitale finale: <b>${money(state.capital)}</b></p>
             `;
@@ -562,63 +676,148 @@
 
         style.textContent = `
             #${MOD_ID}-panel {
-                position:fixed; inset:3vh 3vw; overflow:auto;
-                z-index:999999; display:none; max-width:1200px;
-                margin:auto; padding:18px; color:#f8f1e7;
-                background:#1c211f; border:2px solid #b58b57;
-                border-radius:14px; box-shadow:0 10px 45px #000b;
-                font:14px/1.5 system-ui,Arial,sans-serif;
+                position: fixed;
+                inset: 3vh 3vw;
+                overflow: auto;
+                z-index: 999999;
+                display: none;
+                max-width: 1200px;
+                margin: auto;
+                padding: 18px;
+                color: #f8f1e7;
+                background: #1c211f;
+                border: 2px solid #b58b57;
+                border-radius: 14px;
+                box-shadow: 0 10px 45px #000b;
+                font: 14px/1.5 system-ui, Arial, sans-serif;
             }
-            #${MOD_ID}-panel * { box-sizing:border-box; }
-            #${MOD_ID}-panel h2 { margin-top:0; }
+
+            #${MOD_ID}-panel * {
+                box-sizing: border-box;
+            }
+
+            #${MOD_ID}-panel h2 {
+                margin-top: 0;
+            }
+
             #${MOD_ID}-panel .rs-grid {
-                display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
-                gap:10px;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
             }
+
             #${MOD_ID}-panel .rs-card {
-                min-width:0; padding:12px; background:#292f2c;
-                border:1px solid #49534d; border-radius:9px;
+                min-width: 0;
+                padding: 12px;
+                background: #292f2c;
+                border: 1px solid #49534d;
+                border-radius: 9px;
             }
+
             #${MOD_ID}-panel input,
             #${MOD_ID}-panel select {
-                width:100%; padding:8px; margin:4px 0 8px;
-                border-radius:6px; border:1px solid #626d65;
-                background:#121715; color:white;
+                width: 100%;
+                padding: 8px;
+                margin: 4px 0 8px;
+                border-radius: 6px;
+                border: 1px solid #626d65;
+                background: #121715;
+                color: white;
             }
+
             #${MOD_ID}-panel button {
-                padding:9px 12px; margin:4px 4px 4px 0;
-                border:0; border-radius:7px; background:#a96c3b;
-                color:white; font-weight:bold; cursor:pointer;
+                padding: 9px 12px;
+                margin: 4px 4px 4px 0;
+                border: 0;
+                border-radius: 7px;
+                background: #a96c3b;
+                color: white;
+                font-weight: bold;
+                cursor: pointer;
             }
+
+            #${MOD_ID}-panel button.rs-confirm {
+                width: 100%;
+                background: #218838;
+                color: white;
+            }
+
+            #${MOD_ID}-panel button.rs-confirm:hover {
+                background: #28a745;
+            }
+
             #${MOD_ID}-panel button:disabled {
-                opacity:.45; cursor:not-allowed;
+                opacity: .45;
+                cursor: not-allowed;
             }
+
             #${MOD_ID}-panel .rs-stat {
-                font-size:24px; font-weight:800; color:#ffd18a;
+                font-size: 24px;
+                font-weight: 800;
+                color: #ffd18a;
             }
+
             #${MOD_ID}-panel .rs-muted {
-                color:#c5c1b7; font-size:12px; overflow-wrap:anywhere;
+                color: #c5c1b7;
+                font-size: 12px;
+                overflow-wrap: anywhere;
             }
+
             #${MOD_ID}-panel .rs-metrics {
-                display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
-                gap:5px; margin:10px 0;
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 5px;
+                margin: 10px 0;
             }
+
             #${MOD_ID}-panel .rs-metrics span {
-                padding:6px; border-radius:5px; background:#3b443e;
-                text-align:center; font-size:11px;
+                padding: 6px;
+                border-radius: 5px;
+                background: #3b443e;
+                text-align: center;
+                font-size: 11px;
             }
+
             #${MOD_ID}-panel .rs-metrics b {
-                display:block; color:#ffd18a; font-size:15px;
+                display: block;
+                color: #ffd18a;
+                font-size: 15px;
             }
+
+            #${MOD_ID}-panel .rs-confirmed {
+                display: inline-block;
+                padding: 4px 8px;
+                margin: 5px 0;
+                color: #b7f7c4;
+                background: #174d2a;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+
             #${MOD_ID}-panel .rs-report {
-                padding:10px; margin:10px 0; border-left:3px solid #bd8b51;
-                background:#292f2c;
+                padding: 10px;
+                margin: 10px 0;
+                border-left: 3px solid #bd8b51;
+                background: #292f2c;
             }
-            #${MOD_ID}-panel .positive { color:#8fe0a0; }
-            #${MOD_ID}-panel .negative { color:#ff9a8d; }
-            @media(max-width:700px) {
-                #${MOD_ID}-panel { inset:1vh 1vw; padding:10px; }
-                #${MOD_ID}-panel .rs-grid { grid-template-columns:1fr; }
+
+            #${MOD_ID}-panel .positive {
+                color: #8fe0a0;
+            }
+
+            #${MOD_ID}-panel .negative {
+                color: #ff9a8d;
+            }
+
+            @media (max-width: 700px) {
+                #${MOD_ID}-panel {
+                    inset: 1vh 1vw;
+                    padding: 10px;
+                }
+
+                #${MOD_ID}-panel .rs-grid {
+                    grid-template-columns: 1fr;
+                }
             }
         `;
 
@@ -643,7 +842,7 @@
                 <div>
                     <h2>🍽️ Restoration Simulator</h2>
                     <div class="rs-muted">
-                        Tre giornate · Due piatti al giorno · Sei ricette per ciclo
+                        Tre giornate · Due piatti al giorno · Sei ricette diverse
                     </div>
                 </div>
                 <button id="rs-close">Chiudi ✕</button>
@@ -662,24 +861,28 @@
 
             <h3>1. Crea le tue ricette</h3>
             <div class="rs-card">
-                <label>Nome del piatto</label>
+                <label for="rs-name">Nome del piatto</label>
                 <input id="rs-name" placeholder="Es. Risotto gourmet al tartufo">
 
-                <label>Ingredienti separati da virgole</label>
+                <label for="rs-ingredients">Ingredienti separati da virgole</label>
                 <input id="rs-ingredients" placeholder="riso, tartufo, burro, parmigiano">
 
-                <label>Tool separati da virgole</label>
+                <label for="rs-tools">Tool separati da virgole</label>
                 <input id="rs-tools" placeholder="pentola, coltello, frullatore">
 
                 <button id="rs-add">+ Aggiungi ricetta</button>
                 <button id="rs-discover">Importa ricette esposte dal gioco</button>
+
                 <div class="rs-muted">
-                    Inserisci i nomi degli ingredienti e dei tool usati.
-                    L'importazione automatica dipende dalle API esposte dalla versione del gioco.
+                    Le ricette nuove non vengono assegnate automaticamente.
+                    Scegli uno slot e premi la spunta verde per confermare.
                 </div>
             </div>
 
-            <h3 style="margin-top:18px">2. Crea il menu delle tre giornate</h3>
+            <h3 style="margin-top:18px">
+                2. Menu delle tre giornate — conferma ogni slot con ✓
+            </h3>
+
             <div id="rs-slots" class="rs-grid"></div>
 
             <div style="margin:12px 0">
@@ -688,7 +891,7 @@
                 <button id="rs-reset-all">Azzera la simulazione</button>
             </div>
 
-            <div id="rs-status" class="rs-muted" role="status"></div>
+            <div id="rs-status" class="rs-muted" role="status" aria-live="polite"></div>
 
             <h3 style="margin-top:18px">3. Bilancio giornaliero</h3>
             <div id="rs-results"></div>
@@ -703,7 +906,8 @@
         document.body.appendChild(panel);
 
         launcher.addEventListener("click", () => {
-            panel.style.display = panel.style.display === "none" ? "block" : "none";
+            panel.style.display =
+                panel.style.display === "none" ? "block" : "none";
             render();
         });
 
@@ -712,15 +916,17 @@
         });
 
         $("#rs-add").addEventListener("click", () => {
-            addRecipe(
+            const added = addRecipe(
                 $("#rs-name").value,
                 $("#rs-ingredients").value,
                 $("#rs-tools").value
             );
 
-            $("#rs-name").value = "";
-            $("#rs-ingredients").value = "";
-            $("#rs-tools").value = "";
+            if (added) {
+                $("#rs-name").value = "";
+                $("#rs-ingredients").value = "";
+                $("#rs-tools").value = "";
+            }
         });
 
         $("#rs-run-day").addEventListener("click", simulateDay);
@@ -733,6 +939,8 @@
                 state.recipes.map(recipe => recipe.name.toLowerCase())
             );
 
+            let imported = 0;
+
             for (const item of found) {
                 if (existing.has(item.name.toLowerCase())) continue;
 
@@ -744,12 +952,14 @@
                 recipe.metrics = estimateMetrics(recipe);
                 state.recipes.push(recipe);
                 existing.add(item.name.toLowerCase());
+                imported++;
             }
 
             const ingredients = discoverIngredients();
 
             $("#rs-status").textContent =
-                "Ricette importate: " + found.length +
+                "Nuove ricette importate: " + imported +
+                ". Ricette individuate: " + found.length +
                 ". Ingredienti individuati: " + ingredients.length + ".";
 
             save();
@@ -761,29 +971,36 @@
         if (state.recipes.length) return;
 
         const examples = [
-            ["Risotto gourmet ai funghi",
+            [
+                "Risotto gourmet ai funghi",
                 "riso, funghi, brodo, parmigiano, burro",
-                "pentola, mestolo"],
-
-            ["Tartare di pomodoro e basilico",
+                "pentola, mestolo"
+            ],
+            [
+                "Tartare di pomodoro e basilico",
                 "pomodoro, basilico, olio, sale, limone",
-                "coltello, tagliere"],
-
-            ["Dessert al cioccolato e caramello",
+                "coltello, tagliere"
+            ],
+            [
+                "Dessert al cioccolato e caramello",
                 "cioccolato, panna, zucchero, burro, sale",
-                "frusta, pentolino"],
-
-            ["Pasta al pesto artigianale",
+                "frusta, pentolino"
+            ],
+            [
+                "Pasta al pesto artigianale",
                 "pasta, basilico, pinoli, parmigiano, olio",
-                "pentola, frullatore"],
-
-            ["Salmone glassato con verdure",
+                "pentola, frullatore"
+            ],
+            [
+                "Salmone glassato con verdure",
                 "salmone, miele, limone, carote, zucchine",
-                "padella, coltello"],
-
-            ["Torta stratificata ai frutti rossi",
+                "padella, coltello"
+            ],
+            [
+                "Torta stratificata ai frutti rossi",
                 "farina, uova, zucchero, panna, fragole, lamponi",
-                "forno, frusta"]
+                "forno, frusta"
+            ]
         ];
 
         for (const [name, ingredients, tools] of examples) {
@@ -799,14 +1016,20 @@
         }
     }
 
+    // Inizializzazione.
     load();
 
-    // Aggiorna le metriche salvate nel caso la formula sia cambiata.
     state.recipes.forEach(recipe => {
+        recipe.ingredients = Array.isArray(recipe.ingredients)
+            ? recipe.ingredients : [];
+
+        recipe.tools = Array.isArray(recipe.tools)
+            ? recipe.tools : [];
+
         recipe.metrics = estimateMetrics(recipe);
     });
 
-    // Importa le ricette visibili prima di aggiungere gli esempi.
+    // Importa ricette esposte dal gioco, se disponibili.
     for (const recipe of discoverRecipes()) {
         if (!state.recipes.some(
             current => current.name.toLowerCase() === recipe.name.toLowerCase()
