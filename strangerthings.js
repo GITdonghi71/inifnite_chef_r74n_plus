@@ -104,70 +104,82 @@ addIngredient("hawkins_fire", {
 });
 
 // Personaggi di Hawkins
+// Personaggi di Hawkins
 addIngredient("mike_wheeler", {
     color: "#5377A8",
     innerColor: "#B8D0ED",
-    type: "doll"
+    type: "doll",
+    shape: "doll"
 });
 
 addIngredient("dustin_henderson", {
     color: "#C78B45",
     innerColor: "#F1D1A0",
-    type: "doll"
+    type: "doll",
+    shape: "doll"
 });
 
 addIngredient("lucas_sinclair", {
     color: "#477D56",
     innerColor: "#B6D9B1",
-    type: "doll"
+    type: "doll",
+    shape: "doll"
 });
 
 addIngredient("will_byers", {
     color: "#6384A0",
     innerColor: "#C3D6E5",
-    type: "doll"
+    type: "doll",
+    shape: "doll"
 });
 
 addIngredient("max_mayfield", {
     color: "#B94F49",
     innerColor: "#F0B0A6",
-    type: "doll"
+    type: "doll",
+    shape: "doll"
 });
 
 addIngredient("jim_hopper", {
     color: "#53634B",
     innerColor: "#B8C4A5",
-    type: "doll"
+    type: "doll",
+    shape: "doll"
 });
 
 addIngredient("joyce_byers", {
     color: "#A85D47",
     innerColor: "#E8B7A0",
-    type: "doll"
+    type: "doll",
+    shape: "doll"
 });
 
 addIngredient("steve_harrington", {
     color: "#8B6849",
     innerColor: "#D9B995",
-    type: "doll"
+    type: "doll",
+    shape: "doll"
 });
 
 addIngredient("nancy_wheeler", {
     color: "#6D5A91",
     innerColor: "#C8B8E3",
-    type: "doll"
+    type: "doll",
+    shape: "doll"
 });
 
 addIngredient("robin_buckley", {
     color: "#438B87",
     innerColor: "#A8DCD2",
-    type: "doll"
+    type: "doll",
+    shape: "doll"
 });
 
 addIngredient("eddie_munson", {
     color: "#4C4C59",
     innerColor: "#B9B7C8",
-    type: "doll"
+    type: "doll",
+    shape: "doll"
 });
 
 // Creature del Sottosopra
