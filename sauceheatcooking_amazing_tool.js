@@ -398,45 +398,47 @@
     // ELENCO INGREDIENTI FRITTI
     // --------------------------------------------------
 
-    function renderDatabase() {
-        if (!panel) return;
+    
+function renderDatabase() {
+    if (!panel) return;
 
-        const list = panel.querySelector("#" + PREFIX + "-list");
+    const list = panel.querySelector("#" + PREFIX + "-list");
+    if (!list) return;
 
-        if (!list) return;
+    // Ricostruisce l'elenco senza duplicare gli ID.
+    list.replaceChildren();
 
-        list.replaceChildren();
+    const uniqueItems = [
+        ...new Map(database.map(item => [item.id, item])).values()
+    ];
 
-        database.forEach(item => {
-            const row = document.createElement("div");
+    uniqueItems.forEach(item => {
+        const row = document.createElement("div");
 
-            row.style.cssText =
-                "padding:8px;margin:5px 0;background:#30231f;" +
-                "border-radius:6px;overflow-wrap:anywhere;";
+        row.style.cssText =
+            "padding:8px;margin:5px 0;background:#30231f;" +
+            "border-radius:6px;overflow-wrap:anywhere;";
 
-            const title = document.createElement("strong");
-            title.textContent = item.id;
+        const title = document.createElement("strong");
+        title.textContent = item.id;
 
-            const swatch = document.createElement("span");
+        const swatch = document.createElement("span");
+        swatch.style.cssText =
+            "display:inline-block;width:12px;height:12px;" +
+            "border-radius:50%;margin-left:8px;background:" +
+            (getColor(item.color) || "#654321");
 
-            swatch.style.cssText =
-                "display:inline-block;width:12px;height:12px;" +
-                "border-radius:50%;margin-left:8px;background:" +
-                (getColor(item.color) || "#654321");
+        const details = document.createElement("div");
+        details.style.cssText = "font-size:12px;color:#ddd;";
+        details.textContent =
+            "Salsa: " + item.sauceId +
+            " | Ingrediente originale: " + item.originalId;
 
-            const details = document.createElement("div");
+        row.append(title, swatch, details);
+        list.appendChild(row);
+    });
+}
 
-            details.style.cssText =
-                "font-size:12px;color:#ddd;";
-
-            details.textContent =
-                "Salsa: " + item.sauceId +
-                " | Ingrediente originale: " + item.originalId;
-
-            row.append(title, swatch, details);
-            list.appendChild(row);
-        });
-    }
 
     // --------------------------------------------------
     // CREAZIONE PANNELLO
@@ -734,18 +736,16 @@
                 createdAt: new Date().toISOString()
             };
 
-            const index = database.findIndex(
-                item => item.id === resultId
-            );
+            const index = database.findIndex(item => item.id === resultId);
 
-            if (index >= 0) {
-                database[index] = record;
-            } else {
-                database.unshift(record);
-            }
+if (index >= 0) {
+    database[index] = record;
+} else {
+    database.unshift(record);
+}
 
-            saveDatabase();
-            renderDatabase();
+saveDatabase();
+renderDatabase();
 
             /*
              * Il messaggio di successo viene stampato una sola volta
