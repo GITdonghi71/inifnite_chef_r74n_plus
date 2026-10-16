@@ -422,19 +422,33 @@ function renderSauces() {
         const list = document.createElement("div");
         list.id = PREFIX + "-list";
 
+        const clearPanelButton = makeButton("🧹 Pulisci pannello", () => {
+    if (!panel) return;
+
+    // Pulisce soltanto l'elenco visibile nel pannello.
+    const list = panel.querySelector("#" + PREFIX + "-list");
+
+    if (list) {
+        list.replaceChildren();
+    }
+
+    status("Pannello pulito. I dati salvati non sono stati cancellati.");
+});
+
         panel.append(
-            title,
-            explanation,
-            sauceSelect,
-            heatButton,
-            statusElement,
-            dbTitle,
-            list,
-            makeButton("Aggiorna elenco salse", renderSauces),
-            makeButton("Chiudi", () => {
-                panel.style.display = "none";
-            })
-        );
+    title,
+    explanation,
+    sauceSelect,
+    heatButton,
+    statusElement,
+    dbTitle,
+    list,
+    makeButton("Aggiorna elenco salse", renderSauces),
+    clearPanelButton,
+    makeButton("Chiudi", () => {
+        panel.style.display = "none";
+    })
+);
 
         document.body.appendChild(panel);
 
