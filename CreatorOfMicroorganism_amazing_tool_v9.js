@@ -1,9 +1,10 @@
+
 /*
  * creator_of_microorganisms.js
- * v8.0 - Identita univoca, genetica, tratti estesi, qualita e valore
+ * v9.0 - Identita univoca, genetica, tratti estesi, qualita e valore
  *
  * API previste dal repository: addIngredient, addRecipe, addTool.
- * L'integrazione con Restoration Simulator avviene tramite
+ * Integrazione con Restoration Simulator:
  * window.microorganismRegistry[id].
  *
  * NOTA: qualita/prezzo sono valori ludici, non dati biologici reali.
@@ -14,59 +15,41 @@
   if (typeof addIngredient !== "function" ||
       typeof addRecipe !== "function" ||
       typeof addTool !== "function") {
-    console.error("[Microorganisms v8] Mancano addIngredient/addRecipe/addTool.");
+    console.error("[Microorganisms v9] Mancano addIngredient/addRecipe/addTool.");
     return;
   }
 
-  const VERSION = "8.0";
+  const VERSION = "9.0";
   const TOOL_ID = "creator_of_microorganisms";
 
   const SPECIES = {
     bacterium: {
-      label: "Batterio",
-      shape: "microbe",
-      color: "#78C878",
-      cell: "procariote",
-      base: 55
+      label: "Batterio", shape: "microbe",
+      color: "#78C878", cell: "procariote", base: 55
     },
     yeast: {
-      label: "Lievito",
-      shape: "fungus",
-      color: "#E7C56D",
-      cell: "eucariote",
-      base: 62
+      label: "Lievito", shape: "fungus",
+      color: "#E7C56D", cell: "eucariote", base: 62
     },
     mold: {
-      label: "Muffa",
-      shape: "fungus",
-      color: "#A88BD0",
-      cell: "eucariote",
-      base: 58
+      label: "Muffa", shape: "fungus",
+      color: "#A88BD0", cell: "eucariote", base: 58
     },
     archaea: {
-      label: "Archeo",
-      shape: "microbe",
-      color: "#E28D60",
-      cell: "procariote",
-      base: 72
+      label: "Archeo", shape: "microbe",
+      color: "#E28D60", cell: "procariote", base: 72
     },
     microalgae: {
-      label: "Microalga",
-      shape: "algae",
-      color: "#4DBA91",
-      cell: "eucariote",
-      base: 65
+      label: "Microalga", shape: "algae",
+      color: "#4DBA91", cell: "eucariote", base: 65
     },
     hybrid: {
-      label: "Ibrido",
-      shape: "double_helix",
-      color: "#5AB8CE",
-      cell: "misto",
-      base: 80
+      label: "Ibrido", shape: "double_helix",
+      color: "#5AB8CE", cell: "misto", base: 80
     }
   };
 
-  // Ogni tratto influenza le caratteristiche simulate del microrganismo.
+  // Tutti i tratti della v8.0 sono mantenuti.
   const TRAITS = {
     divisione_binaria: {
       label: "Divisione binaria", q: 2, v: 3,
@@ -324,107 +307,268 @@
     profilo_neutro: {
       label: "Profilo neutro", q: 1, v: 2,
       p: ["profilo neutro"], f: ["neutro"], c: "#B9B9B0"
+    },
+
+    // Nuovi tratti v9.0
+    rigenerazione_avanzata: {
+      label: "Rigenerazione avanzata", q: 5, v: 9,
+      p: ["rigenerazione avanzata"], f: ["fresco", "pulito"], c: "#50C7A5"
+    },
+    efficienza_metabolica: {
+      label: "Efficienza metabolica", q: 4, v: 8,
+      p: ["efficienza metabolica"], f: ["pulito"], c: "#C4C96C"
+    },
+    resistenza_pressione: {
+      label: "Resistenza alla pressione", q: 4, v: 7,
+      p: ["tolleranza alla pressione"], f: ["minerale"], c: "#7196B7"
+    },
+    resistenza_uv: {
+      label: "Resistenza UV", q: 4, v: 8,
+      p: ["resistenza UV simulata"], f: ["minerale"], c: "#A78AD1"
+    },
+    crioprotezione: {
+      label: "Crioprotezione", q: 4, v: 8,
+      p: ["protezione dal congelamento"], f: ["fresco"], c: "#80D5ED"
+    },
+    termoregolazione: {
+      label: "Adattamento termico", q: 4, v: 8,
+      p: ["adattamento termico"], f: ["neutro"], c: "#D98B56"
+    },
+    produzione_lipidi: {
+      label: "Produzione di lipidi", q: 3, v: 7,
+      p: ["produzione lipidica"], f: ["untuoso"], c: "#B6BC69"
+    },
+    produzione_pigmenti: {
+      label: "Produzione di pigmenti", q: 3, v: 7,
+      p: ["produzione di pigmenti"], f: ["vegetale"], c: "#D78CA5"
+    },
+    quorum_sensing: {
+      label: "Comunicazione cellulare", q: 4, v: 8,
+      p: ["comunicazione cellulare simulata"], f: ["armonico"], c: "#6DB8C1"
+    },
+    simbiosi_avanzata: {
+      label: "Simbiosi avanzata", q: 5, v: 10,
+      p: ["simbiosi avanzata"], f: ["armonico", "complesso"], c: "#7AC99C"
+    },
+    filtrazione: {
+      label: "Filtrazione ambientale", q: 3, v: 6,
+      p: ["filtrazione simulata"], f: ["pulito"], c: "#9DC6B0"
+    },
+    accumulo_risorse: {
+      label: "Accumulo di risorse", q: 3, v: 7,
+      p: ["accumulo di risorse"], f: ["concentrato"], c: "#C9A65B"
+    },
+    fermentazione_lenta: {
+      label: "Fermentazione lenta", q: 3, v: 7,
+      p: ["fermentazione lenta"], f: ["fermentato", "complesso"], c: "#C99B5D"
+    },
+    profilo_balsamico: {
+      label: "Profilo balsamico", q: 3, v: 7,
+      p: ["profilo balsamico"], f: ["balsamico", "fresco"], c: "#7AAE85"
+    },
+    aroma_legnoso: {
+      label: "Aroma legnoso", q: 2, v: 5,
+      p: ["profilo aromatico legnoso"], f: ["legnoso"], c: "#997456"
+    },
+    aroma_speziato: {
+      label: "Aroma speziato", q: 3, v: 6,
+      p: ["profilo aromatico speziato"], f: ["speziato"], c: "#C27E53"
+    },
+    equilibrio_metabolico: {
+      label: "Equilibrio metabolico", q: 4, v: 8,
+      p: ["equilibrio metabolico"], f: ["armonico", "pulito"], c: "#8ABDA0"
+    },
+    membrana_rinforzata: {
+      label: "Membrana rinforzata", q: 4, v: 8,
+      p: ["membrana rinforzata"], f: ["neutro"], c: "#83A6C4"
     }
   };
 
   const INGREDIENT_RULES = [
     {
-      re: /sugar|honey|syrup|zucchero|miele|glucose/,
+      re: /sugar|honey|syrup|zucchero|miele|glucose|glucosio|sciroppo/,
       traits: ["dolcezza", "accumulo_energia"],
-      flavors: ["dolce", "caramellato"],
-      color: "#E5B94E",
-      value: 4
+      flavors: ["dolce", "caramellato"], color: "#E5B94E", value: 4
     },
     {
-      re: /lemon|lime|vinegar|citric|limone|aceto|acid/,
+      re: /lemon|lime|vinegar|citric|limone|aceto|acid|acido|agrum/,
       traits: ["acidita", "produzione_acidi"],
-      flavors: ["acido", "agrumato"],
-      color: "#D7D95D",
-      value: 4
+      flavors: ["acido", "agrumato"], color: "#D7D95D", value: 4
     },
     {
-      re: /berry|strawberry|apple|grape|fruit|frutta|mela|fragola/,
+      re: /berry|strawberry|apple|grape|fruit|frutta|mela|fragola|pera|pesca|banana|arancia|orange|uva|lampone|raspberry|mirtillo|blueberry/,
       traits: ["aroma_fruttato"],
-      flavors: ["fruttato", "dolce"],
-      color: "#D77C9D",
-      value: 7
+      flavors: ["fruttato", "dolce"], color: "#D77C9D", value: 7
     },
     {
-      re: /salt|sale|brine/,
+      re: /salt|sale|brine|salamoia/,
       traits: ["sapidita", "resistenza_sale"],
-      flavors: ["salato", "minerale"],
-      color: "#9AC7D9",
-      value: 3
+      flavors: ["salato", "minerale"], color: "#9AC7D9", value: 3
     },
     {
       re: /mushroom|fungus|truffle|fungo|tartufo/,
       traits: ["umami", "biodegradazione"],
-      flavors: ["terroso", "umami"],
-      color: "#A58B70",
-      value: 8
+      flavors: ["terroso", "umami"], color: "#A58B70", value: 8
     },
     {
-      re: /meat|beef|chicken|fish|carne|pesce/,
+      re: /meat|beef|chicken|fish|carne|pesce|pollo|manzo|maiale/,
       traits: ["umami", "produzione_proteine"],
-      flavors: ["umami", "sapido"],
-      color: "#B96E62",
-      value: 7
+      flavors: ["umami", "sapido"], color: "#B96E62", value: 7
     },
     {
-      re: /coffee|cocoa|chocolate|caffe|cacao|cioccolato/,
+      re: /coffee|cocoa|chocolate|caffe|cacao|cioccolato|espresso/,
       traits: ["aroma_tostato", "amarezza"],
-      flavors: ["amaro", "tostato"],
-      color: "#93664F",
-      value: 7
+      flavors: ["amaro", "tostato"], color: "#93664F", value: 7
     },
     {
-      re: /milk|cream|butter|cheese|latte|panna|burro|formaggio/,
+      re: /milk|cream|butter|cheese|latte|panna|burro|formaggio|yogurt|yoghurt/,
       traits: ["cremosita", "produzione_acidi"],
-      flavors: ["cremoso", "lattico"],
-      color: "#E5D6A8",
-      value: 6
+      flavors: ["cremoso", "lattico"], color: "#E5D6A8", value: 6
     },
     {
-      re: /smok|affumicat/,
-      traits: ["aroma_tostato"],
-      flavors: ["affumicato", "legnoso"],
-      color: "#9B7258",
-      value: 5
+      re: /smok|affumicat|fumo/,
+      traits: ["aroma_tostato", "aroma_legnoso"],
+      flavors: ["affumicato", "legnoso"], color: "#9B7258", value: 5
     },
     {
       re: /caramel|caramell/,
       traits: ["dolcezza", "aroma_tostato"],
-      flavors: ["caramellato", "tostato"],
-      color: "#D99A45",
-      value: 6
+      flavors: ["caramellato", "tostato"], color: "#D99A45", value: 6
     },
     {
       re: /vitamin|vitamina/,
       traits: ["produzione_vitamine"],
-      flavors: ["vegetale"],
-      color: "#E6C85C",
-      value: 8
+      flavors: ["vegetale"], color: "#E6C85C", value: 8
     },
     {
-      re: /mineral|minerale|calcium|iron|ferro/,
+      re: /mineral|minerale|calcium|iron|ferro|calcio|magnesio|magnesium/,
       traits: ["assorbimento_minerali"],
-      flavors: ["minerale"],
-      color: "#9EB4B9",
-      value: 5
+      flavors: ["minerale"], color: "#9EB4B9", value: 5
     },
     {
-      re: /oil|olio|olive/,
-      traits: ["accumulo_energia"],
-      flavors: ["untuoso"],
-      color: "#A7B95A",
-      value: 4
+      re: /oil|olio|olive|oliva|grasso|fat/,
+      traits: ["accumulo_energia", "produzione_lipidi"],
+      flavors: ["untuoso"], color: "#A7B95A", value: 4
     },
     {
-      re: /flower|floral|fiore|lavender|rosa/,
+      re: /flower|floral|fiore|lavender|rosa|lavanda|gelsomino|jasmine/,
       traits: ["aroma_floreale"],
-      flavors: ["floreale"],
-      color: "#C99BD5",
-      value: 8
+      flavors: ["floreale"], color: "#C99BD5", value: 8
+    },
+    {
+      re: /bread|pane|wheat|grano|farina|flour|cereal|orzo|barley|riso|rice/,
+      traits: ["fermentazione", "assorbimento_nutrienti"],
+      flavors: ["cereale", "fermentato"], color: "#C7AD7B", value: 5
+    },
+    {
+      re: /herb|erba|basil|basilico|mint|menta|rosemary|rosmarino|thyme|timo/,
+      traits: ["profilo_balsamico", "aroma_floreale"],
+      flavors: ["erbaceo", "balsamico"], color: "#79B27B", value: 6
+    },
+    {
+      re: /spice|spezi|pepper|pepe|chili|peperoncino|ginger|zenzero|cinnamon|cannella/,
+      traits: ["aroma_speziato"],
+      flavors: ["speziato"], color: "#C27E53", value: 6
+    },
+    {
+      re: /protein|proteina|legume|bean|fagiolo|lentil|lenticchia|soy|soia/,
+      traits: ["produzione_proteine", "assorbimento_nutrienti"],
+      flavors: ["umami"], color: "#A5A86E", value: 6
+    },
+    {
+      re: /algae|alga|seaweed|kelp|spirulina/,
+      traits: ["fotosintesi", "clorofilla", "assorbimento_minerali"],
+      flavors: ["vegetale", "minerale"], color: "#4DBA91", value: 8
+    }
+  ];
+
+  /*
+   * Gli alias dei trattamenti vengono ricondotti a un nome canonico.
+   * I trattamenti aggiungono tratti e sapori, senza duplicare i tratti.
+   */
+  const TREATMENT_RULES = [
+    {
+      id: "normale",
+      aliases: ["normale", "normal", "standard", "nessuno", "none", "nulla"],
+      traits: [], flavors: [], value: 0
+    },
+    {
+      id: "affumicato",
+      aliases: ["affumicato", "affumicatura", "smoked", "smoking", "smoke", "fumo"],
+      traits: ["aroma_tostato", "aroma_legnoso"],
+      flavors: ["affumicato", "legnoso"], value: 5
+    },
+    {
+      id: "caramellato",
+      aliases: ["caramellato", "caramellatura", "caramello", "caramelized", "caramelised", "caramel"],
+      traits: ["dolcezza", "aroma_tostato"],
+      flavors: ["caramellato", "tostato"], value: 6
+    },
+    {
+      id: "innesto",
+      aliases: ["innesto", "graft", "grafting", "ibridazione", "hybridization", "hybridisation", "ricombinazione"],
+      traits: ["ricombinazione"],
+      flavors: ["complesso"], value: 8
+    },
+    {
+      id: "restoration",
+      aliases: ["restoration", "restauro", "restaurazione", "ripristino", "restoration simulator", "recupero"],
+      traits: ["stabilita_genetica", "rigenerazione"],
+      flavors: ["pulito", "fresco"], value: 7
+    },
+    {
+      id: "essiccato",
+      aliases: ["essiccato", "essiccazione", "disidratato", "dried", "drying", "dehydrated", "dehydration"],
+      traits: ["resistenza_siccita", "dormienza"],
+      flavors: ["concentrato"], value: 4
+    },
+    {
+      id: "raffreddato",
+      aliases: ["raffreddato", "raffreddamento", "freddo", "chilled", "chilling", "cooled", "cooling"],
+      traits: ["adattamento_al_freddo", "crioprotezione"],
+      flavors: ["fresco"], value: 4
+    },
+    {
+      id: "riscaldato",
+      aliases: ["riscaldato", "riscaldamento", "heated", "heating", "heat treatment", "trattamento termico"],
+      traits: ["termoresistenza", "termoregolazione"],
+      flavors: ["tostato"], value: 4
+    },
+    {
+      id: "fermentato",
+      aliases: ["fermentato", "fermentazione", "fermented", "fermentation"],
+      traits: ["fermentazione", "fermentazione_lenta"],
+      flavors: ["fermentato", "acidulo"], value: 5
+    },
+    {
+      id: "purificato",
+      aliases: ["purificato", "purificazione", "purified", "purification", "raffinato", "refined"],
+      traits: ["stabilita_genetica", "equilibrio_metabolico"],
+      flavors: ["pulito"], value: 6
+    },
+    {
+      id: "irradiato",
+      aliases: ["irradiato", "irradiazione", "irradiated", "irradiation", "uv", "raggi uv"],
+      traits: ["resistenza_uv", "riparazione_dna"],
+      flavors: ["minerale"], value: 5
+    },
+    {
+      id: "mineralizzato",
+      aliases: ["mineralizzato", "mineralizzazione", "mineralized", "mineralised", "mineralization"],
+      traits: ["assorbimento_minerali", "metabolismo_estremo"],
+      flavors: ["minerale"], value: 5
+    },
+    {
+      id: "inoculato",
+      aliases: ["inoculato", "inoculazione", "inoculated", "inoculation", "coltura iniziale", "starter culture"],
+      traits: ["crescita", "divisione_binaria"],
+      flavors: ["neutro"], value: 3
+    },
+    {
+      id: "stabilizzato",
+      aliases: ["stabilizzato", "stabilizzazione", "stabilized", "stabilised", "stabilization"],
+      traits: ["stabilita_genetica", "equilibrio_metabolico"],
+      flavors: ["pulito"], value: 5
     }
   ];
 
@@ -489,27 +633,23 @@
     );
   }
 
+  // Limite rigido di due ingredienti distinti; nessun prompt per ingredienti extra.
   function readIngredients() {
     const a = ask("Ingrediente 1 (nome o ID):", "bread");
 
     if (a === null || !a) return null;
 
-    const b = ask("Ingrediente 2 (nome o ID):", "sugar");
+    const b = ask("Ingrediente 2 (nome o ID, facoltativo):", "sugar");
 
-    if (b === null || !b) return null;
+    if (b === null) return null;
 
-    const extra = ask(
-      "Altri ingredienti/ingredienti di salsa, separati da virgole (facoltativo):",
-      ""
-    );
+    const ingredients = unique(
+      [a, b]
+        .map(x => String(x || "").trim())
+        .filter(Boolean)
+    ).slice(0, 2);
 
-    if (extra === null) return null;
-
-    return unique([
-      a,
-      b,
-      ...extra.split(",").map(x => x.trim()).filter(Boolean)
-    ]);
+    return ingredients.length ? ingredients : null;
   }
 
   function deriveIngredientEffects(ingredients) {
@@ -534,7 +674,58 @@
     return {
       traits: unique(traits),
       flavors: unique(flavors),
-      colors,
+      colors: unique(colors),
+      value
+    };
+  }
+
+  function parseTreatments(text) {
+    const raw = String(text || "")
+      .split(",")
+      .map(x => slug(x.replace(/_/g, " ")))
+      .filter(Boolean);
+
+    const result = [];
+    const unknown = [];
+
+    for (const item of raw) {
+      const found = TREATMENT_RULES.find(rule =>
+        rule.id === item ||
+        rule.aliases.some(alias => slug(alias) === item)
+      );
+
+      if (found) {
+        if (!result.includes(found.id)) result.push(found.id);
+      } else {
+        // Conserva i nomi sconosciuti per non perdere i dati inseriti.
+        if (!unknown.includes(item)) unknown.push(item);
+      }
+    }
+
+    return {
+      treatments: unique([...result, ...unknown]),
+      recognized: result,
+      unknown
+    };
+  }
+
+  function getTreatmentEffects(treatments) {
+    const traits = [];
+    const flavors = [];
+    let value = 0;
+
+    for (const id of treatments) {
+      const rule = TREATMENT_RULES.find(x => x.id === id);
+      if (!rule) continue;
+
+      traits.push(...rule.traits);
+      flavors.push(...rule.flavors);
+      value += rule.value;
+    }
+
+    return {
+      traits: unique(traits),
+      flavors: unique(flavors),
       value
     };
   }
@@ -582,6 +773,7 @@
     }
   }
 
+  // Mantenuta per compatibilità con l'API del repository.
   function createRecipe(input, output) {
     try {
       addRecipe(input, output);
@@ -673,9 +865,27 @@
     const selectedTraits = parseTraits(traitText);
     const ingredientEffects = deriveIngredientEffects(ingredients);
 
+    const treatmentRaw = ask(
+      "Trattamenti ricevuti, separati da virgole.\n" +
+      "Esempi: normale, affumicato, caramellato, innesto, restoration,\n" +
+      "essiccato, raffreddato, riscaldato, fermentato, purificato,\n" +
+      "irradiato, mineralizzato, inoculato, stabilizzato.\n" +
+      "Sono riconosciuti anche sinonimi in italiano e inglese.",
+      "normale"
+    );
+
+    if (treatmentRaw === null) return;
+
+    const parsedTreatments = parseTreatments(treatmentRaw);
+    const treatments = parsedTreatments.treatments;
+    const treatmentEffects = getTreatmentEffects(
+      parsedTreatments.recognized
+    );
+
     const allTraits = unique([
       ...selectedTraits,
       ...ingredientEffects.traits,
+      ...treatmentEffects.traits,
       ...(mode === "caldo" ? ["termoresistenza"] : []),
       ...(mode === "freddo" ? ["adattamento_al_freddo"] : []),
       ...(mode === "stress"
@@ -735,31 +945,28 @@
       properties.push("profilo fermentativo aromatico");
     }
 
-    const treatmentRaw = ask(
-      "Trattamenti ricevuti (normale, affumicato, caramellato, innesto, restoration; separati da virgole):",
-      "normale"
-    );
-
-    if (treatmentRaw === null) return;
-
-    const treatments = unique(
-      treatmentRaw.split(",").map(slug)
-    );
-
-    if (treatments.includes("affumicato")) {
-      allTraits.push("aroma_tostato");
+    if (
+      allTraits.includes("simbiosi") &&
+      allTraits.includes("quorum_sensing")
+    ) {
+      combos.push("rete_simbiotica");
+      properties.push("rete di comunicazione simbiotica");
     }
 
-    if (treatments.includes("caramellato")) {
-      allTraits.push("dolcezza");
+    if (
+      allTraits.includes("crioprotezione") &&
+      allTraits.includes("resistenza_siccita")
+    ) {
+      combos.push("resistenza_climatica");
+      properties.push("adattamento combinato a freddo e siccità");
     }
 
-    if (treatments.includes("innesto")) {
-      allTraits.push("ricombinazione");
-    }
-
-    if (treatments.includes("restoration")) {
-      allTraits.push("stabilita_genetica");
+    if (
+      allTraits.includes("produzione_pigmenti") &&
+      allTraits.includes("fotosintesi")
+    ) {
+      combos.push("pigmentazione_fotosintetica");
+      properties.push("pigmentazione fotosintetica avanzata");
     }
 
     const traits = unique(allTraits);
@@ -779,13 +986,10 @@
     let value =
       species.base * 0.55 +
       ingredientEffects.value +
+      treatmentEffects.value +
       traits.reduce((s, t) => s + (TRAITS[t]?.v || 0), 0) +
       combos.length * 12 +
       ingredients.length * 2;
-
-    if (treatments.includes("affumicato")) value += 5;
-    if (treatments.includes("caramellato")) value += 6;
-    if (treatments.includes("innesto")) value += 8;
 
     value = Math.max(
       1,
@@ -794,13 +998,8 @@
 
     const flavors = unique([
       ...ingredientEffects.flavors,
-      ...traits.flatMap(t => TRAITS[t]?.f || []),
-      ...(treatments.includes("affumicato")
-        ? ["affumicato", "legnoso"]
-        : []),
-      ...(treatments.includes("caramellato")
-        ? ["caramellato", "tostato"]
-        : [])
+      ...treatmentEffects.flavors,
+      ...traits.flatMap(t => TRAITS[t]?.f || [])
     ]);
 
     const textures = unique(
@@ -818,7 +1017,7 @@
     ]);
 
     // Stessa combinazione di input = stessa firma genetica.
-    // Ogni singola produzione riceve comunque un ID distinto.
+    // Ogni produzione riceve comunque un ID distinto.
     const canonical = JSON.stringify({
       speciesId,
       cell,
@@ -877,6 +1076,8 @@
       shape: species.shape,
       generation: 1,
       treatments,
+      recognizedTreatments: parsedTreatments.recognized,
+      unrecognizedTreatments: parsedTreatments.unknown,
       parents: [],
       egg: false,
       signature: canonical
@@ -888,7 +1089,9 @@
       `Qualità: ${data.quality}/100 (${data.qualityLabel})`,
       `Valore stimato: €${data.price}`,
       `Colore: ${color}`,
+      `Ingredienti: ${ingredients.join(", ")}`,
       `Tratti: ${traits.join(", ")}`,
+      `Trattamenti: ${treatments.join(", ")}`,
       `Gusti: ${data.flavors.join(", ")}`
     ].join(" | ");
 
@@ -958,21 +1161,32 @@
       registry[eggId] = eggData;
     }
 
+    window.microorganismRegistry = registry;
+
+    const warning = parsedTreatments.unknown.length
+      ? "\nTrattamenti non riconosciuti (salvati comunque): " +
+        parsedTreatments.unknown.join(", ")
+      : "";
+
     alert(
       `MICRORGANISMO UNIVOCO CREATO\n\n` +
       `ID produzione: ${id}\n` +
       `ID genetico: ${geneticId}\n` +
       `Specie: ${species.label}\n` +
+      `Ingredienti (${ingredients.length}/2): ${ingredients.join(", ")}\n` +
       `Colore: ${color}\n` +
       `Qualità: ${quality}/100 (${data.qualityLabel})\n` +
       `Prezzo stimato: €${value}\n` +
       `Costo stimato: €${data.estimatedCost}\n\n` +
       `Tratti:\n${traits.join(", ")}\n\n` +
+      `Trattamenti riconosciuti:\n` +
+      `${parsedTreatments.recognized.join(", ") || "Nessuno"}\n\n` +
       `Combinazioni:\n${combos.join(", ") || "Nessuna"}\n\n` +
       `Proprietà:\n${properties.join(", ") || "Nessuna combinazione speciale"}\n\n` +
       `Gusti:\n${data.flavors.join(", ")}\n\n` +
       `Consistenze:\n${textures.join(", ") || "cellulare"}\n\n` +
-      `Uovo: ${eggId}`
+      `Uovo: ${eggId}` +
+      warning
     );
   }
 
@@ -981,11 +1195,19 @@
       `${id} — ${t.label} | qualità ${t.q >= 0 ? "+" : ""}${t.q} | valore +${t.v}`
     );
 
+    const treatments = TREATMENT_RULES.map(rule =>
+      `${rule.id} — alias: ${rule.aliases.join(", ")}`
+    );
+
     alert(
       "DATABASE TRATTI (" +
       lines.length +
       ")\n\n" +
-      lines.join("\n")
+      lines.join("\n") +
+      "\n\nTRATTAMENTI RICONOSCIUTI (" +
+      TREATMENT_RULES.length +
+      ")\n\n" +
+      treatments.join("\n")
     );
   }
 
@@ -1027,6 +1249,8 @@
 
   console.log(
     `[Microorganisms] v${VERSION} caricato. ` +
-    `Tratti disponibili: ${Object.keys(TRAITS).length}.`
+    `Tratti disponibili: ${Object.keys(TRAITS).length}; ` +
+    `trattamenti riconosciuti: ${TREATMENT_RULES.length}.`
   );
 })();
+
