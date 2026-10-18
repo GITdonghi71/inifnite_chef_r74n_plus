@@ -1,1126 +1,1032 @@
-
 /*
  * creator_of_microorganisms.js
- * VERSIONE 7.0 - GENETICA PROCEDURALE
+ * v8.0 - Identita univoca, genetica, tratti estesi, qualita e valore
  *
- * Include:
- * - Genetica ereditaria e mutazioni deterministiche
- * - Colori derivati da specie, tratti e ingredienti
- * - Proprietà biologiche calcolate
- * - Gusti, aromi e consistenze
- * - Interazioni tra tratti
- * - Ereditarietà nelle uova e nella schiusa
- * - Metadati per salse, nutrienti, affumicatura,
- *   caramellizzazione, innesti e restauri
+ * API previste dal repository: addIngredient, addRecipe, addTool.
+ * L'integrazione con Restoration Simulator avviene tramite
+ * window.microorganismRegistry[id].
  *
- * Richiede le API globali addIngredient e addTool.
+ * NOTA: qualita/prezzo sono valori ludici, non dati biologici reali.
  */
-
 (function () {
-    "use strict";
+  "use strict";
+
+  if (typeof addIngredient !== "function" ||
+      typeof addRecipe !== "function" ||
+      typeof addTool !== "function") {
+    console.error("[Microorganisms v8] Mancano addIngredient/addRecipe/addTool.");
+    return;
+  }
+
+  const VERSION = "8.0";
+  const TOOL_ID = "creator_of_microorganisms";
+
+  const SPECIES = {
+    bacterium: {
+      label: "Batterio",
+      shape: "microbe",
+      color: "#78C878",
+      cell: "procariote",
+      base: 55
+    },
+    yeast: {
+      label: "Lievito",
+      shape: "fungus",
+      color: "#E7C56D",
+      cell: "eucariote",
+      base: 62
+    },
+    mold: {
+      label: "Muffa",
+      shape: "fungus",
+      color: "#A88BD0",
+      cell: "eucariote",
+      base: 58
+    },
+    archaea: {
+      label: "Archeo",
+      shape: "microbe",
+      color: "#E28D60",
+      cell: "procariote",
+      base: 72
+    },
+    microalgae: {
+      label: "Microalga",
+      shape: "algae",
+      color: "#4DBA91",
+      cell: "eucariote",
+      base: 65
+    },
+    hybrid: {
+      label: "Ibrido",
+      shape: "double_helix",
+      color: "#5AB8CE",
+      cell: "misto",
+      base: 80
+    }
+  };
+
+  // Ogni tratto influenza le caratteristiche simulate del microrganismo.
+  const TRAITS = {
+    divisione_binaria: {
+      label: "Divisione binaria", q: 2, v: 3,
+      p: ["riproduzione rapida"], f: ["neutro"], c: "#8BD18B"
+    },
+    crescita: {
+      label: "Crescita rapida", q: 1, v: 3,
+      p: ["crescita rapida"], f: ["delicato"], c: "#A5D77B"
+    },
+    sporulazione: {
+      label: "Sporulazione", q: 3, v: 5,
+      p: ["formazione di spore"], f: ["terroso"],
+      t: ["granuloso"], c: "#B69B7D"
+    },
+    dormienza: {
+      label: "Dormienza", q: 2, v: 4,
+      p: ["dormienza"], f: ["delicato"], c: "#9CA7B4"
+    },
+    rigenerazione: {
+      label: "Rigenerazione", q: 4, v: 7,
+      p: ["rigenerazione"], f: ["fresco"], c: "#61C5A1"
+    },
+    mutazione: {
+      label: "Mutabilità", q: 1, v: 6,
+      p: ["mutabilità elevata"], f: ["complesso"], c: "#BD83D5"
+    },
+    ricombinazione: {
+      label: "Ricombinazione", q: 4, v: 8,
+      p: ["ricombinazione genetica"], f: ["complesso"], c: "#5AB8CE"
+    },
+    fotosintesi: {
+      label: "Fotosintesi", q: 4, v: 7,
+      p: ["fotosintesi"], f: ["vegetale", "fresco"], c: "#43B978"
+    },
+    clorofilla: {
+      label: "Clorofilla", q: 2, v: 4,
+      p: ["pigmento verde"], f: ["erbaceo"], c: "#68B85C"
+    },
+    fermentazione: {
+      label: "Fermentazione", q: 4, v: 8,
+      p: ["fermentazione"], f: ["fermentato", "acidulo"],
+      t: ["effervescente"], c: "#D7A24B"
+    },
+    chemosintesi: {
+      label: "Chemiosintesi", q: 5, v: 9,
+      p: ["produzione energetica chimica"], f: ["minerale"], c: "#C59D68"
+    },
+    bioluminescenza: {
+      label: "Bioluminescenza", q: 6, v: 14,
+      p: ["luminescenza simulata"], f: ["minerale"], c: "#42E5D4"
+    },
+    termoresistenza: {
+      label: "Termoresistenza", q: 4, v: 7,
+      p: ["resistenza al calore"], f: ["tostato"], c: "#D86D36"
+    },
+    adattamento_al_freddo: {
+      label: "Adattamento al freddo", q: 3, v: 6,
+      p: ["tolleranza al freddo"], f: ["fresco"], c: "#73D8EA"
+    },
+    acidofilia: {
+      label: "Acidofilia", q: 3, v: 5,
+      p: ["tolleranza all'acidità"], f: ["acido"], c: "#D5A4E8"
+    },
+    alcalofilia: {
+      label: "Alcalofilia", q: 3, v: 5,
+      p: ["tolleranza all'alcalinità"], f: ["minerale"], c: "#8BB9A2"
+    },
+    resistenza_siccita: {
+      label: "Resistenza alla siccità", q: 3, v: 6,
+      p: ["resistenza alla siccità"], f: ["concentrato"], c: "#C9A66B"
+    },
+    resistenza_sale: {
+      label: "Resistenza al sale", q: 3, v: 5,
+      p: ["tolleranza salina"], f: ["salato", "minerale"], c: "#85B7C9"
+    },
+    resistenza_tossine: {
+      label: "Resistenza alle tossine", q: 4, v: 7,
+      p: ["resistenza alle tossine"], f: ["amaro"], c: "#8D7AB6"
+    },
+    produzione_enzimi: {
+      label: "Produzione di enzimi", q: 4, v: 8,
+      p: ["produzione enzimatica"], f: ["umami"], c: "#D6B65D"
+    },
+    produzione_vitamine: {
+      label: "Produzione di vitamine", q: 5, v: 10,
+      p: ["produzione vitaminica simulata"],
+      f: ["vegetale", "dolce"], c: "#E6C85C"
+    },
+    biodegradazione: {
+      label: "Biodegradazione", q: 3, v: 6,
+      p: ["decomposizione organica"], f: ["terroso"], c: "#9B875E"
+    },
+    motilita: {
+      label: "Motilità", q: 2, v: 5,
+      p: ["mobilità"], f: ["fresco"], c: "#55B9C8"
+    },
+    biofilm: {
+      label: "Biofilm", q: 3, v: 6,
+      p: ["formazione di biofilm"], f: ["cremoso"],
+      t: ["viscoso"], c: "#8BBCA6"
+    },
+    ife: {
+      label: "Ife", q: 2, v: 4,
+      p: ["struttura ifale"], f: ["terroso"],
+      t: ["filamentoso"], c: "#B39AD0"
+    },
+    capsula_protettiva: {
+      label: "Capsula protettiva", q: 4, v: 7,
+      p: ["capsula protettiva"], f: ["neutro"],
+      t: ["gelatinoso"], c: "#9CC7D7"
+    },
+    pigmentazione: {
+      label: "Pigmentazione", q: 2, v: 5,
+      p: ["pigmentazione speciale"], f: ["vegetale"], c: "#D88FB3"
+    },
+    simbiosi: {
+      label: "Simbiosi", q: 5, v: 10,
+      p: ["simbiosi"], f: ["armonico"], c: "#8BCB9B"
+    },
+    parassitismo: {
+      label: "Parassitismo", q: 1, v: 5,
+      p: ["parassitismo simulato"], f: ["amaro"], c: "#8C719B"
+    },
+    predazione: {
+      label: "Predazione microbica", q: 2, v: 7,
+      p: ["predazione simulata"], f: ["intenso"], c: "#BA7777"
+    },
+    produzione_tossine: {
+      label: "Produzione di tossine", q: -2, v: 4,
+      p: ["produzione di tossine simulata"], f: ["amaro"], c: "#80699B"
+    },
+    riparazione_dna: {
+      label: "Riparazione del DNA", q: 6, v: 11,
+      p: ["riparazione genetica"], f: ["neutro"], c: "#83A5D4"
+    },
+    resistenza_antibiotici: {
+      label: "Resistenza agli antibiotici", q: 1, v: 5,
+      p: ["resistenza simulata"], f: ["amaro"], c: "#918A72"
+    },
+    produzione_proteine: {
+      label: "Produzione proteica", q: 3, v: 7,
+      p: ["sintesi proteica"], f: ["umami"], c: "#B6A76D"
+    },
+    assorbimento_minerali: {
+      label: "Assorbimento minerale", q: 3, v: 6,
+      p: ["assorbimento minerale"], f: ["minerale"], c: "#9EB4B9"
+    },
+    accumulo_energia: {
+      label: "Accumulo energetico", q: 4, v: 8,
+      p: ["riserva energetica"], f: ["dolce"], c: "#E0B75B"
+    },
+    tolleranza_osmotica: {
+      label: "Tolleranza osmotica", q: 3, v: 6,
+      p: ["tolleranza osmotica"], f: ["salato"], c: "#8FB9C5"
+    },
+    chemotassi: {
+      label: "Chemotassi", q: 2, v: 5,
+      p: ["chemotassi simulata"], f: ["fresco"], c: "#5DB9AE"
+    },
+    sporulazione_resistente: {
+      label: "Spore resistenti", q: 5, v: 9,
+      p: ["spore resistenti"], f: ["terroso"],
+      t: ["granuloso"], c: "#A88B64"
+    },
+    produzione_acidi: {
+      label: "Produzione di acidi", q: 2, v: 5,
+      p: ["metaboliti acidi"], f: ["acido"], c: "#D8A0D1"
+    },
+    produzione_alcoli: {
+      label: "Produzione di alcoli", q: 3, v: 6,
+      p: ["metaboliti alcolici simulati"],
+      f: ["fruttato", "fermentato"], c: "#D8B45C"
+    },
+    aroma_fruttato: {
+      label: "Aroma fruttato", q: 3, v: 7,
+      p: ["profilo aromatico fruttato"], f: ["fruttato"], c: "#D77C9D"
+    },
+    aroma_floreale: {
+      label: "Aroma floreale", q: 3, v: 7,
+      p: ["profilo aromatico floreale"], f: ["floreale"], c: "#D6A4D8"
+    },
+    aroma_tostato: {
+      label: "Aroma tostato", q: 2, v: 5,
+      p: ["profilo aromatico tostato"], f: ["tostato"], c: "#A77B59"
+    },
+    umami: {
+      label: "Profilo umami", q: 4, v: 8,
+      p: ["profilo umami"], f: ["umami", "sapido"], c: "#B98C62"
+    },
+    dolcezza: {
+      label: "Profilo dolce", q: 2, v: 5,
+      p: ["profilo dolce"], f: ["dolce"], c: "#E5C56D"
+    },
+    acidita: {
+      label: "Profilo acidulo", q: 2, v: 5,
+      p: ["profilo acidulo"], f: ["acido", "acidulo"], c: "#D6D36A"
+    },
+    amarezza: {
+      label: "Profilo amaro", q: 1, v: 3,
+      p: ["profilo amaro"], f: ["amaro"], c: "#8F805C"
+    },
+    sapidita: {
+      label: "Profilo sapido", q: 2, v: 5,
+      p: ["profilo sapido"], f: ["salato", "sapido"], c: "#8FAEBB"
+    },
+    cremosita: {
+      label: "Consistenza cremosa", q: 3, v: 6,
+      p: ["consistenza cremosa"], f: ["cremoso"],
+      t: ["cremoso"], c: "#E1D2A4"
+    },
+    viscosita: {
+      label: "Consistenza viscosa", q: 2, v: 5,
+      p: ["consistenza viscosa"], f: ["neutro"],
+      t: ["viscoso"], c: "#9DB9A4"
+    },
+    croccantezza: {
+      label: "Consistenza granulosa", q: 1, v: 3,
+      p: ["consistenza granulosa"], f: ["tostato"],
+      t: ["granuloso"], c: "#C4A47A"
+    },
+    adattamento: {
+      label: "Adattamento ambientale", q: 4, v: 8,
+      p: ["adattabilità"], f: ["complesso"], c: "#7CA6C8"
+    },
+    stabilita_genetica: {
+      label: "Stabilità genetica", q: 6, v: 12,
+      p: ["stabilità genetica"], f: ["pulito"], c: "#80B6C8"
+    },
+    metabolismo_estremo: {
+      label: "Metabolismo estremo", q: 5, v: 10,
+      p: ["metabolismo estremo"], f: ["minerale"], c: "#D18A5E"
+    },
+    assorbimento_nutrienti: {
+      label: "Assorbimento nutrienti", q: 3, v: 6,
+      p: ["assorbimento nutrienti"], f: ["vegetale"], c: "#9CCB78"
+    },
+    divisione_lenta: {
+      label: "Divisione lenta", q: 1, v: 3,
+      p: ["crescita lenta"], f: ["concentrato"], c: "#9BA9A5"
+    },
+    resistenza_radiazioni: {
+      label: "Resistenza alle radiazioni", q: 5, v: 10,
+      p: ["resistenza simulata alle radiazioni"], f: ["minerale"], c: "#B58DCB"
+    },
+    aggregazione: {
+      label: "Aggregazione cellulare", q: 2, v: 5,
+      p: ["aggregazione"], f: ["cremoso"],
+      t: ["aggregato"], c: "#9FC4B0"
+    },
+    secrezione_polimeri: {
+      label: "Secrezione di polimeri", q: 3, v: 7,
+      p: ["secrezione di polimeri"], f: ["neutro"],
+      t: ["gelatinoso"], c: "#85B6B5"
+    },
+    profilo_neutro: {
+      label: "Profilo neutro", q: 1, v: 2,
+      p: ["profilo neutro"], f: ["neutro"], c: "#B9B9B0"
+    }
+  };
+
+  const INGREDIENT_RULES = [
+    {
+      re: /sugar|honey|syrup|zucchero|miele|glucose/,
+      traits: ["dolcezza", "accumulo_energia"],
+      flavors: ["dolce", "caramellato"],
+      color: "#E5B94E",
+      value: 4
+    },
+    {
+      re: /lemon|lime|vinegar|citric|limone|aceto|acid/,
+      traits: ["acidita", "produzione_acidi"],
+      flavors: ["acido", "agrumato"],
+      color: "#D7D95D",
+      value: 4
+    },
+    {
+      re: /berry|strawberry|apple|grape|fruit|frutta|mela|fragola/,
+      traits: ["aroma_fruttato"],
+      flavors: ["fruttato", "dolce"],
+      color: "#D77C9D",
+      value: 7
+    },
+    {
+      re: /salt|sale|brine/,
+      traits: ["sapidita", "resistenza_sale"],
+      flavors: ["salato", "minerale"],
+      color: "#9AC7D9",
+      value: 3
+    },
+    {
+      re: /mushroom|fungus|truffle|fungo|tartufo/,
+      traits: ["umami", "biodegradazione"],
+      flavors: ["terroso", "umami"],
+      color: "#A58B70",
+      value: 8
+    },
+    {
+      re: /meat|beef|chicken|fish|carne|pesce/,
+      traits: ["umami", "produzione_proteine"],
+      flavors: ["umami", "sapido"],
+      color: "#B96E62",
+      value: 7
+    },
+    {
+      re: /coffee|cocoa|chocolate|caffe|cacao|cioccolato/,
+      traits: ["aroma_tostato", "amarezza"],
+      flavors: ["amaro", "tostato"],
+      color: "#93664F",
+      value: 7
+    },
+    {
+      re: /milk|cream|butter|cheese|latte|panna|burro|formaggio/,
+      traits: ["cremosita", "produzione_acidi"],
+      flavors: ["cremoso", "lattico"],
+      color: "#E5D6A8",
+      value: 6
+    },
+    {
+      re: /smok|affumicat/,
+      traits: ["aroma_tostato"],
+      flavors: ["affumicato", "legnoso"],
+      color: "#9B7258",
+      value: 5
+    },
+    {
+      re: /caramel|caramell/,
+      traits: ["dolcezza", "aroma_tostato"],
+      flavors: ["caramellato", "tostato"],
+      color: "#D99A45",
+      value: 6
+    },
+    {
+      re: /vitamin|vitamina/,
+      traits: ["produzione_vitamine"],
+      flavors: ["vegetale"],
+      color: "#E6C85C",
+      value: 8
+    },
+    {
+      re: /mineral|minerale|calcium|iron|ferro/,
+      traits: ["assorbimento_minerali"],
+      flavors: ["minerale"],
+      color: "#9EB4B9",
+      value: 5
+    },
+    {
+      re: /oil|olio|olive/,
+      traits: ["accumulo_energia"],
+      flavors: ["untuoso"],
+      color: "#A7B95A",
+      value: 4
+    },
+    {
+      re: /flower|floral|fiore|lavender|rosa/,
+      traits: ["aroma_floreale"],
+      flavors: ["floreale"],
+      color: "#C99BD5",
+      value: 8
+    }
+  ];
+
+  let productionCounter = 0;
+  const registry = window.microorganismRegistry || Object.create(null);
+  window.microorganismRegistry = registry;
+
+  function slug(v) {
+    return String(v ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 70) || "input";
+  }
+
+  function hash(s) {
+    let h = 2166136261;
+
+    for (let i = 0; i < String(s).length; i++) {
+      h ^= String(s).charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+
+    return (h >>> 0).toString(36);
+  }
+
+  function unique(a) {
+    return [...new Set(a.filter(Boolean).map(String))];
+  }
+
+  function ask(msg, initial) {
+    const r = prompt(msg, initial || "");
+    return r === null ? null : r.trim();
+  }
+
+  function choose(msg, options, initial) {
+    const answer = ask(
+      msg + "\n\n" +
+      options.map((x, i) => `${i + 1}. ${x.label}`).join("\n") +
+      "\n\nNumero:",
+      String(initial || 1)
+    );
+
+    if (answer === null) return null;
+
+    const n = Number(answer);
+
+    return Number.isInteger(n) && n >= 1 && n <= options.length
+      ? options[n - 1].id
+      : null;
+  }
+
+  function parseTraits(text) {
+    return unique(
+      String(text)
+        .split(",")
+        .map(slug)
+        .filter(t => TRAITS[t])
+    );
+  }
+
+  function readIngredients() {
+    const a = ask("Ingrediente 1 (nome o ID):", "bread");
+
+    if (a === null || !a) return null;
+
+    const b = ask("Ingrediente 2 (nome o ID):", "sugar");
+
+    if (b === null || !b) return null;
+
+    const extra = ask(
+      "Altri ingredienti/ingredienti di salsa, separati da virgole (facoltativo):",
+      ""
+    );
+
+    if (extra === null) return null;
+
+    return unique([
+      a,
+      b,
+      ...extra.split(",").map(x => x.trim()).filter(Boolean)
+    ]);
+  }
+
+  function deriveIngredientEffects(ingredients) {
+    const traits = [];
+    const flavors = [];
+    const colors = [];
+    let value = 0;
+
+    for (const name of ingredients) {
+      const id = slug(name);
+
+      for (const rule of INGREDIENT_RULES) {
+        if (rule.re.test(id)) {
+          traits.push(...rule.traits);
+          flavors.push(...rule.flavors);
+          colors.push(rule.color);
+          value += rule.value;
+        }
+      }
+    }
+
+    return {
+      traits: unique(traits),
+      flavors: unique(flavors),
+      colors,
+      value
+    };
+  }
+
+  function rgb(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+
+    if (!m) return [120, 200, 120];
+
+    const n = parseInt(m[1], 16);
+
+    return [
+      (n >> 16) & 255,
+      (n >> 8) & 255,
+      n & 255
+    ];
+  }
+
+  function blend(colors) {
+    const cs = unique(colors).map(rgb);
+
+    if (!cs.length) return "#78C878";
+
+    const c = [0, 0, 0];
+
+    cs.forEach(x => {
+      c[0] += x[0];
+      c[1] += x[1];
+      c[2] += x[2];
+    });
+
+    return "#" + c
+      .map(v => Math.round(v / cs.length).toString(16).padStart(2, "0"))
+      .join("")
+      .toUpperCase();
+  }
+
+  function createIngredient(id, data) {
+    try {
+      addIngredient(id, data);
+      return true;
+    } catch (e) {
+      console.error("[Microorganisms] addIngredient fallito", id, e);
+      return false;
+    }
+  }
+
+  function createRecipe(input, output) {
+    try {
+      addRecipe(input, output);
+      return true;
+    } catch (e) {
+      console.warn(
+        "[Microorganisms] Ricetta non registrata",
+        input,
+        output,
+        e
+      );
+      return false;
+    }
+  }
+
+  function createMicroorganism() {
+    const speciesId = choose(
+      "Seleziona il tipo di organismo",
+      Object.keys(SPECIES).map(id => ({
+        id,
+        label: SPECIES[id].label
+      })),
+      1
+    );
+
+    if (!speciesId) return;
+
+    const species = SPECIES[speciesId];
+
+    const cell = choose(
+      "Tipo cellulare",
+      [
+        { id: "procariote", label: "Procariote" },
+        { id: "eucariote", label: "Eucariote" },
+        { id: "misto", label: "Misto / ibrido" }
+      ],
+      species.cell === "eucariote" ? 2 : 1
+    );
+
+    if (!cell) return;
+
+    const mode = choose(
+      "Condizione di produzione",
+      [
+        { id: "normale", label: "Normale" },
+        { id: "caldo", label: "Caldo" },
+        { id: "freddo", label: "Freddo" },
+        { id: "stress", label: "Stress ambientale" }
+      ],
+      1
+    );
+
+    if (!mode) return;
+
+    const tempRaw = ask(
+      "Temperatura di produzione in °C:",
+      mode === "caldo" ? "37" : mode === "freddo" ? "4" : "20"
+    );
 
     if (
-        typeof addIngredient !== "function" ||
-        typeof addTool !== "function"
+      tempRaw === null ||
+      tempRaw === "" ||
+      !Number.isFinite(Number(tempRaw))
     ) {
-        console.error("[Microorganisms] API non disponibili.");
-        return;
+      return;
     }
 
-    const VERSION = "7.0";
-    const PREFIX = "microorganism_";
-    const registry = Object.create(null);
-
-    const SPECIES = {
-        bacterium: {
-            label: "Batterio",
-            shape: "microbe",
-            color: "#75C878",
-            traits: ["divisione_binaria", "metabolismo"]
-        },
-        yeast: {
-            label: "Lievito",
-            shape: "fungus",
-            color: "#E4C878",
-            traits: ["fermentazione", "crescita"]
-        },
-        mold: {
-            label: "Muffa",
-            shape: "fungus",
-            color: "#A18ACB",
-            traits: ["ife", "sporulazione"]
-        },
-        archaea: {
-            label: "Archeo",
-            shape: "microbe",
-            color: "#DE8B55",
-            traits: ["adattamento", "metabolismo_estremo"]
-        },
-        microalgae: {
-            label: "Microalga",
-            shape: "algae",
-            color: "#43B978",
-            traits: ["fotosintesi", "clorofilla"]
-        },
-        hybrid: {
-            label: "Ibrido",
-            shape: "double_helix",
-            color: "#59B7CB",
-            traits: ["ricombinazione", "adattamento"]
-        }
-    };
-
-    const TRAITS = {
-        fotosintesi: {
-            properties: ["produzione_di_energia_luminosa"],
-            flavors: ["vegetale", "fresco"],
-            colors: ["#43B978", "#A2D66D"]
-        },
-        clorofilla: {
-            properties: ["pigmento_verde"],
-            flavors: ["erbaceo"],
-            colors: ["#39A95E", "#8CCB63"]
-        },
-        fermentazione: {
-            properties: ["produzione_di_metaboliti"],
-            flavors: ["fermentato", "acidulo"],
-            textures: ["effervescente"],
-            colors: ["#D9A441", "#C77B50"]
-        },
-        bioluminescenza: {
-            properties: ["luminescenza"],
-            flavors: ["minerale"],
-            colors: ["#42E5D4", "#6A8DFF"]
-        },
-        termoresistenza: {
-            properties: ["resistenza_al_calore"],
-            flavors: ["tostato"],
-            colors: ["#D86D36", "#E9A343"]
-        },
-        psicrofilia: {
-            properties: ["adattamento_al_freddo"],
-            flavors: ["fresco"],
-            colors: ["#73D8EA", "#92B9FF"]
-        },
-        acidofilia: {
-            properties: ["tolleranza_all_acidita"],
-            flavors: ["acido"],
-            colors: ["#D5A4E8", "#E68AA7"]
-        },
-        alcalofilia: {
-            properties: ["tolleranza_all_alcalinita"],
-            flavors: ["minerale"],
-            colors: ["#8BB9A2", "#A3C8B9"]
-        },
-        resistenza_siccita: {
-            properties: ["resistenza_alla_siccita"],
-            flavors: ["concentrato"],
-            colors: ["#C9A66B", "#B7A16A"]
-        },
-        resistenza_sale: {
-            properties: ["tolleranza_al_sale"],
-            flavors: ["salato", "minerale"],
-            colors: ["#85B7C9", "#A0C7D9"]
-        },
-        produzione_tossine: {
-            properties: ["produzione_di_tossine"],
-            flavors: ["amaro"],
-            colors: ["#9870B8", "#78629B"]
-        },
-        produzione_enzimi: {
-            properties: ["produzione_di_enzimi"],
-            flavors: ["umami"],
-            colors: ["#D6B65D", "#91B56A"]
-        },
-        produzione_vitamine: {
-            properties: ["produzione_di_vitamine"],
-            flavors: ["dolce", "vegetale"],
-            colors: ["#E6C85C", "#8CCB63"]
-        },
-        biodegradazione: {
-            properties: ["decomposizione_organica"],
-            flavors: ["terroso"],
-            colors: ["#9B875E", "#78915A"]
-        },
-        motilita: {
-            properties: ["mobilita"],
-            flavors: ["fresco"],
-            colors: ["#55B9C8", "#70D4C3"]
-        },
-        biofilm: {
-            properties: ["formazione_di_biofilm"],
-            flavors: ["cremoso"],
-            textures: ["viscoso"],
-            colors: ["#8BBCA6", "#B3C7A4"]
-        },
-        sporulazione: {
-            properties: ["formazione_di_spore"],
-            flavors: ["terroso"],
-            textures: ["granuloso"],
-            colors: ["#A58B70", "#B7A17D"]
-        },
-        adattamento: {
-            properties: ["adattabilita"],
-            flavors: ["complesso"],
-            colors: ["#6CA8C8", "#A18ACB"]
-        },
-        ricombinazione: {
-            properties: ["ricombinazione_genetica"],
-            flavors: ["complesso"],
-            colors: ["#59B7CB", "#BB81D2"]
-        },
-        divisione_binaria: {
-            properties: ["riproduzione_per_divisione"],
-            flavors: ["neutro"],
-            colors: ["#73C878", "#90D18D"]
-        },
-        crescita: {
-            properties: ["crescita"],
-            flavors: ["delicato"],
-            colors: ["#C9D47A", "#9DCB7B"]
-        },
-        ife: {
-            properties: ["struttura_ifeale"],
-            flavors: ["terroso"],
-            textures: ["filamentoso"],
-            colors: ["#A18ACB", "#C1A4D9"]
-        },
-        dormienza: {
-            properties: ["dormienza"],
-            flavors: ["delicato"],
-            colors: ["#8D9AA7", "#A3AEB8"]
-        },
-        rigenerazione: {
-            properties: ["rigenerazione"],
-            flavors: ["fresco"],
-            colors: ["#60C5A2", "#9CCB78"]
-        },
-        resistenza_antibiotici: {
-            properties: ["resistenza_agli_antibiotici"],
-            flavors: ["amaro"],
-            colors: ["#987B91", "#8B8D72"]
-        },
-        riparazione_dna: {
-            properties: ["riparazione_del_dna"],
-            flavors: ["neutro"],
-            colors: ["#83A5D4", "#8CBDAA"]
-        }
-    };
-
-    const FLAVOR_RULES = [
-        {
-            words: ["sugar", "sugarcane", "honey", "syrup",
-                    "sugar_beet", "zucchero", "miele"],
-            flavors: ["dolce", "caramellato"],
-            traits: ["metabolismo_zuccherino"],
-            color: "#E5B94E"
-        },
-        {
-            words: ["lemon", "lime", "vinegar", "citric",
-                    "limone", "aceto", "acid"],
-            flavors: ["acido", "agrumato"],
-            traits: ["metabolismo_acido"],
-            color: "#D7D95D"
-        },
-        {
-            words: ["berry", "strawberry", "apple", "grape",
-                    "fruit", "frutta", "mela", "fragola"],
-            flavors: ["fruttato", "dolce"],
-            traits: ["metabolismo_dei_frutti"],
-            color: "#D77C9D"
-        },
-        {
-            words: ["salt", "sea_salt", "sale"],
-            flavors: ["salato", "minerale"],
-            traits: ["tolleranza_al_sale"],
-            color: "#9AC7D9"
-        },
-        {
-            words: ["mushroom", "fungus", "truffle",
-                    "fungo", "tartufo"],
-            flavors: ["terroso", "umami"],
-            traits: ["metabolismo_fungino"],
-            color: "#A58B70"
-        },
-        {
-            words: ["meat", "beef", "chicken", "fish",
-                    "carne", "pesce"],
-            flavors: ["umami", "sapido"],
-            traits: ["metabolismo_proteico"],
-            color: "#B96E62"
-        },
-        {
-            words: ["coffee", "cocoa", "chocolate",
-                    "caffe", "cacao", "cioccolato"],
-            flavors: ["amaro", "tostato"],
-            traits: ["metabolismo_tostato"],
-            color: "#93664F"
-        },
-        {
-            words: ["milk", "cream", "butter", "cheese",
-                    "latte", "panna", "burro", "formaggio"],
-            flavors: ["cremoso", "lattico"],
-            traits: ["metabolismo_lattico"],
-            color: "#E5D6A8"
-        }
-    ];
-
-    function clean(value) {
-        return String(value == null ? "" : value)
-            .trim()
-            .toLowerCase()
-            .replace(/[^a-z0-9_]+/g, "_")
-            .replace(/^_+|_+$/g, "")
-            .slice(0, 80);
-    }
-
-    function unique(values) {
-        return [...new Set(
-            (Array.isArray(values) ? values : [])
-                .filter(v => v != null && v !== "")
-                .map(v => String(v).trim())
-                .filter(Boolean)
-        )];
-    }
-
-    function hash(value) {
-        const text = String(value);
-        let h = 2166136261;
-
-        for (let i = 0; i < text.length; i++) {
-            h ^= text.charCodeAt(i);
-            h = Math.imul(h, 16777619);
-        }
-
-        return (h >>> 0).toString(36);
-    }
-
-    function getId(item) {
-        if (!item) return "";
-        if (typeof item === "string") return item.trim();
-
-        return String(
-            item.id ||
-            item.name ||
-            item.element ||
-            item.ingredient ||
-            item.key ||
-            ""
-        ).trim();
-    }
-
-    function getDefinition(id) {
-        if (!id) return null;
-        if (registry[id]) return registry[id];
-
-        const sources = [
-            "ingredients",
-            "ingredientData",
-            "ingredientDatabase",
-            "ingredientRegistry"
-        ];
-
-        for (const key of sources) {
-            let source;
-
-            try {
-                source = globalThis[key];
-            } catch (_) {
-                source = null;
-            }
-
-            if (!source) continue;
-
-            if (
-                typeof source === "object" &&
-                !Array.isArray(source) &&
-                source[id]
-            ) {
-                return source[id];
-            }
-
-            if (Array.isArray(source)) {
-                const found = source.find(item =>
-                    item &&
-                    (
-                        item.id === id ||
-                        item.name === id ||
-                        item.element === id
-                    )
-                );
-
-                if (found) return found;
-            }
-        }
-
-        return null;
-    }
-
-    function getData(item) {
-        if (!item) return {};
-
-        if (item.microorganismData) {
-            return item.microorganismData;
-        }
-
-        const def = getDefinition(getId(item));
-
-        if (!def) return {};
-
-        return def.microorganismData || def;
-    }
-
-    function getMetadata(item) {
-        const id = getId(item);
-        const def = getDefinition(id) || {};
-        const data = getData(item);
-
-        function array(...values) {
-            for (const value of values) {
-                if (Array.isArray(value)) return unique(value);
-                if (typeof value === "string" && value.trim()) {
-                    return unique(value.split(","));
-                }
-            }
-            return [];
-        }
-
-        function flag(...values) {
-            return values.some(v =>
-                v === true || v === 1 || v === "true"
-            );
-        }
-
-        return {
-            ingredients: unique([
-                id,
-                ...array(item && item.sauceIngredients),
-                ...array(def.sauceIngredients),
-                ...array(data.sauceIngredients)
-            ]),
-            nutrients: array(
-                item && item.nutrients,
-                def.nutrients,
-                data.nutrients,
-                item && item.sauceNutrients,
-                data.sauceNutrients
-            ),
-            traits: array(
-                item && item.traits,
-                data.traits,
-                item && item.graftTraits,
-                data.graftTraits,
-                item && item.restorationTraits,
-                data.restorationTraits
-            ),
-            flavors: array(
-                item && item.flavors,
-                data.flavors,
-                item && item.tastes,
-                data.tastes
-            ),
-            textures: array(
-                item && item.textures,
-                data.textures
-            ),
-            properties: array(
-                item && item.properties,
-                data.properties
-            ),
-            smoked: flag(
-                item && item.smoked,
-                def.smoked,
-                data.smoked,
-                item && item.isSmoked,
-                data.isSmoked
-            ),
-            caramelized: flag(
-                item && item.caramelized,
-                def.caramelized,
-                data.caramelized,
-                item && item.isCaramelized,
-                data.isCaramelized
-            ),
-            graftTraits: array(
-                item && item.graftTraits,
-                data.graftTraits,
-                item && item.inheritedTraits,
-                data.inheritedTraits
-            ),
-            restorationTraits: array(
-                item && item.restorationTraits,
-                data.restorationTraits,
-                item && item.restoredTraits,
-                data.restoredTraits
-            )
-        };
-    }
-
-    function ask(message, fallback) {
-        if (typeof prompt !== "function") return fallback;
-        const result = prompt(message, fallback);
-        return result == null ? fallback : result.trim();
-    }
-
-    function chooseSpecies() {
-        const keys = Object.keys(SPECIES);
-        const menu = keys.map((key, i) =>
-            (i + 1) + ". " + SPECIES[key].label +
-            " (" + key + ")"
-        ).join("\n");
-
-        const answer = ask(
-            "Scegli la specie:\n" + menu,
-            "1"
-        );
-
-        const n = Number(answer);
-
-        if (Number.isInteger(n) && keys[n - 1]) {
-            return keys[n - 1];
-        }
-
-        const key = clean(answer);
-        return SPECIES[key] ? key : "bacterium";
-    }
-
-    function detectIngredientTraits(metadata) {
-        const traits = [];
-        const flavors = [...metadata.flavors];
-        const textures = [...metadata.textures];
-        const colors = [];
-        const ids = metadata.ingredients.map(clean);
-
-        for (const rule of FLAVOR_RULES) {
-            const matched = ids.some(id =>
-                rule.words.some(word => id.includes(clean(word)))
-            );
-
-            if (matched) {
-                traits.push(...rule.traits);
-                flavors.push(...rule.flavors);
-                colors.push(rule.color);
-            }
-        }
-
-        if (metadata.smoked) {
-            traits.push("affumicatura");
-            flavors.push("affumicato", "legnoso");
-            colors.push("#9B7258");
-        }
-
-        if (metadata.caramelized) {
-            traits.push("caramellizzazione");
-            flavors.push("caramellato", "tostato");
-            colors.push("#D99A45");
-        }
-
-        for (const nutrient of metadata.nutrients) {
-            const n = clean(nutrient);
-
-            if (/protein|proteina|amino/.test(n)) {
-                traits.push("metabolismo_proteico");
-                flavors.push("umami");
-            }
-
-            if (/vitamin|vitamina/.test(n)) {
-                traits.push("assorbimento_vitaminico");
-                flavors.push("vegetale");
-            }
-
-            if (/mineral|minerale|calcium|iron|ferro/.test(n)) {
-                traits.push("assorbimento_minerale");
-                flavors.push("minerale");
-            }
-
-            if (/sugar|glucose|zucchero/.test(n)) {
-                traits.push("metabolismo_zuccherino");
-                flavors.push("dolce");
-            }
-        }
-
-        return {
-            traits: unique(traits),
-            flavors: unique(flavors),
-            textures: unique(textures),
-            colors: unique(colors)
-        };
-    }
-
-    function colorToRgb(hex) {
-        const match = /^#?([0-9a-f]{6})$/i.exec(hex || "");
-
-        if (!match) return [115, 200, 120];
-
-        const n = parseInt(match[1], 16);
-
-        return [
-            (n >> 16) & 255,
-            (n >> 8) & 255,
-            n & 255
-        ];
-    }
-
-    function blendColors(colors) {
-        const valid = unique(colors).map(colorToRgb);
-
-        if (!valid.length) return "#75C878";
-
-        const rgb = [0, 0, 0];
-
-        valid.forEach(c => {
-            rgb[0] += c[0];
-            rgb[1] += c[1];
-            rgb[2] += c[2];
-        });
-
-        const n = valid.length;
-
-        return "#" + rgb.map(v =>
-            Math.round(v / n)
-                .toString(16)
-                .padStart(2, "0")
-        ).join("").toUpperCase();
-    }
-
-    function chooseColor(species, traits, ingredientColors, signature) {
-        const colors = [SPECIES[species].color, ...ingredientColors];
-
-        for (const trait of traits) {
-            const info = TRAITS[trait];
-
-            if (info && info.colors) {
-                colors.push(info.colors[
-                    parseInt(hash(signature + trait), 36) %
-                    info.colors.length
-                ]);
-            }
-        }
-
-        return blendColors(colors);
-    }
-
-    function deriveProperties(traits, metadata) {
-        const properties = [...metadata.properties];
-
-        for (const trait of traits) {
-            const info = TRAITS[trait];
-
-            if (info && info.properties) {
-                properties.push(...info.properties);
-            }
-        }
-
-        if (traits.includes("fotosintesi") &&
-            traits.includes("bioluminescenza")) {
-            properties.push("conversione_energetica_speciale");
-        }
-
-        if (traits.includes("fermentazione") &&
-            traits.includes("metabolismo_zuccherino")) {
-            properties.push("fermentazione_degli_zuccheri");
-        }
-
-        if (traits.includes("termoresistenza") &&
-            traits.includes("resistenza_siccita")) {
-            properties.push("sopravvivenza_in_ambienti_estremi");
-        }
-
-        if (traits.includes("biofilm") &&
-            traits.includes("resistenza_antibiotici")) {
-            properties.push("protezione_collettiva");
-        }
-
-        if (metadata.smoked) properties.push("trattamento_affumicato");
-        if (metadata.caramelized) properties.push("trattamento_caramellizzato");
-
-        return unique(properties);
-    }
-
-    function deriveFlavors(traits, metadata, ingredientResult) {
-        const flavors = [
-            ...metadata.flavors,
-            ...ingredientResult.flavors
-        ];
-
-        const textures = [...metadata.textures, ...ingredientResult.textures];
-
-        for (const trait of traits) {
-            const info = TRAITS[trait];
-
-            if (!info) continue;
-
-            if (info.flavors) flavors.push(...info.flavors);
-            if (info.textures) textures.push(...info.textures);
-        }
-
-        if (traits.includes("fermentazione") &&
-            traits.includes("metabolismo_dei_frutti")) {
-            flavors.push("fruttato-fermentato");
-        }
-
-        if (traits.includes("metabolismo_lattico") &&
-            traits.includes("fermentazione")) {
-            flavors.push("yogurt", "lattico-acidulo");
-            textures.push("cremoso");
-        }
-
-        if (traits.includes("metabolismo_tostato") &&
-            traits.includes("metabolismo_zuccherino")) {
-            flavors.push("caramello-tostato");
-        }
-
-        if (traits.includes("metabolismo_fungino") &&
-            traits.includes("produzione_enzimi")) {
-            flavors.push("umami-intenso");
-        }
-
-        if (metadata.smoked) flavors.push("affumicato");
-        if (metadata.caramelized) flavors.push("caramellato");
-
-        return {
-            flavors: unique(flavors.length ? flavors : ["neutro"]),
-            textures: unique(textures.length ? textures : ["cellulare"])
-        };
-    }
-
-    function registerIngredient(id, definition) {
-        if (getDefinition(id)) return false;
-
-        try {
-            addIngredient(id, definition);
-            registry[id] = definition;
-            return true;
-        } catch (error) {
-            console.error("[Microorganisms] Errore registrando", id, error);
-            return false;
-        }
-    }
-
-    function buildOrganism(parentA, parentB) {
-        const idA = getId(parentA) || "parent_a";
-        const idB = getId(parentB) || "parent_b";
-
-        const dataA = getData(parentA);
-        const dataB = getData(parentB);
-        const metaA = getMetadata(parentA);
-        const metaB = getMetadata(parentB);
-
-        const species = chooseSpecies();
-        const info = SPECIES[species];
-
-        const userTraits = ask(
-            "Inserisci tratti aggiuntivi separati da virgole:",
-            info.traits.join(", ")
-        ).split(",").map(clean).filter(Boolean);
-
-        const inheritedTraits = unique([
-            ...(dataA.traits || []),
-            ...(dataB.traits || []),
-            ...(dataA.inheritedTraits || []),
-            ...(dataB.inheritedTraits || []),
-            ...metaA.traits,
-            ...metaB.traits,
-            ...metaA.graftTraits,
-            ...metaB.graftTraits,
-            ...metaA.restorationTraits,
-            ...metaB.restorationTraits
-        ].map(clean));
-
-        const ingredients = {
-            ingredients: unique([
-                ...metaA.ingredients,
-                ...metaB.ingredients
-            ]),
-            nutrients: unique([
-                ...metaA.nutrients,
-                ...metaB.nutrients
-            ]),
-            flavors: unique([
-                ...metaA.flavors,
-                ...metaB.flavors
-            ]),
-            textures: unique([
-                ...metaA.textures,
-                ...metaB.textures
-            ]),
-            properties: unique([
-                ...metaA.properties,
-                ...metaB.properties
-            ]),
-            smoked: metaA.smoked || metaB.smoked,
-            caramelized: metaA.caramelized || metaB.caramelized,
-            graftTraits: unique([
-                ...metaA.graftTraits,
-                ...metaB.graftTraits
-            ]),
-            restorationTraits: unique([
-                ...metaA.restorationTraits,
-                ...metaB.restorationTraits
-            ])
-        };
-
-        const ingredientResult = detectIngredientTraits(ingredients);
-
-        let traits = unique([
-            ...info.traits,
-            ...userTraits,
-            ...inheritedTraits,
-            ...ingredientResult.traits
-        ]);
-
-        // Interazioni biologiche: le combinazioni creano nuovi tratti.
-        if (traits.includes("fotosintesi") &&
-            traits.includes("bioluminescenza")) {
-            traits.push("energia_luminosa");
-        }
-
-        if (traits.includes("fermentazione") &&
-            traits.includes("metabolismo_zuccherino")) {
-            traits.push("fermentazione_avanzata");
-        }
-
-        if (traits.includes("adattamento") &&
-            traits.includes("termoresistenza")) {
-            traits.push("adattamento_termico");
-        }
-
-        if (traits.includes("ricombinazione") &&
-            traits.includes("riparazione_dna")) {
-            traits.push("stabilita_genetica");
-        }
-
-        traits = unique(traits);
-
-        const generation = Math.max(
-            Number(dataA.generation) || 0,
-            Number(dataB.generation) || 0
-        ) + 1;
-
-        const signatureData = {
-            version: VERSION,
-            parents: [idA, idB].sort(),
-            species: species,
-            traits: traits.slice().sort(),
-            ingredients: ingredients.ingredients.slice().sort(),
-            nutrients: ingredients.nutrients.slice().sort(),
-            smoked: ingredients.smoked,
-            caramelized: ingredients.caramelized,
-            generation: generation
-        };
-
-        const signature = JSON.stringify(signatureData);
-        const id = PREFIX + species + "_" + hash(signature);
-
-        // Le mutazioni sono deterministiche per questa combinazione.
-        const mutationNumber = parseInt(hash(signature + "_mutation"), 36);
-        const mutationChance = mutationNumber % 100;
-
-        const mutations = [];
-
-        if (mutationChance < 18) {
-            mutations.push("mutazione_pigmentazione");
-        }
-
-        if (mutationChance >= 18 && mutationChance < 30) {
-            mutations.push("mutazione_metabolica");
-        }
-
-        if (generation >= 3 && mutationChance % 4 === 0) {
-            mutations.push("mutazione_generazionale");
-        }
-
-        traits = unique([...traits, ...mutations]);
-
-        const color = chooseColor(
-            species,
-            traits,
-            ingredientResult.colors,
-            signature
-        );
-
-        const properties = deriveProperties(traits, ingredients);
-
-        const tasteResult = deriveFlavors(
-            traits,
-            ingredients,
-            ingredientResult
-        );
-
-        const data = {
-            version: VERSION,
-            species: species,
-            traits: traits,
-            inheritedTraits: inheritedTraits,
-            mutations: mutations,
-            properties: properties,
-            flavors: tasteResult.flavors,
-            textures: tasteResult.textures,
-            nutrients: ingredients.nutrients,
-            ingredients: ingredients.ingredients,
-            sauceIngredients: ingredients.ingredients,
-            sauceNutrients: ingredients.nutrients,
-            smoked: ingredients.smoked,
-            caramelized: ingredients.caramelized,
-            graftTraits: ingredients.graftTraits,
-            restorationTraits: ingredients.restorationTraits,
-            parents: [idA, idB],
-            generation: generation,
-            color: color,
-            shape: info.shape,
-            egg: false,
-            signature: signature
-        };
-
-        return {
-            id: id,
-            color: color,
-            shape: info.shape,
-            data: data,
-            signature: signature,
-            definition: {
-                type: "life",
-                color: color,
-                shape: info.shape,
-                microorganism: true,
-                microorganismData: data
-            }
-        };
-    }
-
-    function makeEgg(organism) {
-        const eggId = "microbe_egg_" + hash(organism.signature);
-
-        const eggData = {
-            ...organism.data,
-            traits: [...organism.data.traits],
-            inheritedTraits: [...organism.data.traits],
-            properties: [...organism.data.properties],
-            flavors: [...organism.data.flavors],
-            textures: [...organism.data.textures],
-            ingredients: [...organism.data.ingredients],
-            nutrients: [...organism.data.nutrients],
-            parents: [organism.id],
-            egg: true,
-            parentMicroorganism: organism.id
-        };
-
-        const definition = {
-            type: "life",
-            shape: "embryo",
-            color: organism.color,
-            microorganism: true,
-            microorganismEgg: true,
-            microorganismData: eggData
-        };
-
-        if (!registerIngredient(eggId, definition)) {
-            console.info("[Microorganisms] Uovo già presente:", eggId);
-        }
-
-        return eggId;
-    }
-
-    function createFromPlaced(placed) {
-        if (!placed) {
-            alert("Seleziona il primo ingrediente sul piano.");
-            return;
-        }
-
-        const firstId = getId(placed);
-
-        if (!firstId) {
-            alert("Non riesco a leggere il primo ingrediente.");
-            return;
-        }
-
-        const secondId = ask(
-            "ID esatto del secondo ingrediente:",
-            "sugar"
-        );
-
-        if (!secondId) return;
-
-        const second = getDefinition(secondId);
-
-        if (!second) {
-            alert(
-                "Ingrediente non trovato: " + secondId +
-                "\nVerifica l'ID nel database del gioco."
-            );
-            return;
-        }
-
-        const organism = buildOrganism(placed, {
-            ...second,
-            id: secondId,
-            name: secondId
-        });
-
-        if (!registerIngredient(organism.id, organism.definition)) {
-            alert("Organismo già registrato o errore di registrazione.");
-            return;
-        }
-
-        const eggId = makeEgg(organism);
-
-        alert(
-            "NUOVO MICRORGANISMO!\n\n" +
-            "ID: " + organism.id + "\n" +
-            "Specie: " + organism.data.species + "\n" +
-            "Colore: " + organism.color + "\n" +
-            "Generazione: " + organism.data.generation + "\n\n" +
-            "TRATTI:\n" + organism.data.traits.join(", ") + "\n\n" +
-            "PROPRIETÀ:\n" + organism.data.properties.join(", ") + "\n\n" +
-            "GUSTI:\n" + organism.data.flavors.join(", ") + "\n\n" +
-            "CONSISTENZA:\n" + organism.data.textures.join(", ") + "\n\n" +
-            "MUTAZIONI:\n" +
-            (organism.data.mutations.join(", ") || "Nessuna") + "\n\n" +
-            "Uovo creato: " + eggId
-        );
-    }
-
-    function hatchEgg(placed) {
-        if (!placed) {
-            alert("Seleziona un uovo sul piano.");
-            return;
-        }
-
-        const eggId = getId(placed);
-        const data = getData(placed);
-
-        if (!(
-            placed.microorganismEgg ||
-            data.egg ||
-            eggId.startsWith("microbe_egg_")
-        )) {
-            alert("L'ingrediente selezionato non è un uovo riconosciuto.");
-            return;
-        }
-
-        const species = SPECIES[data.species]
-            ? data.species
-            : "bacterium";
-
-        const signature = JSON.stringify({
-            egg: eggId,
-            traits: unique(data.traits || []).sort(),
-            generation: Number(data.generation) || 1
-        });
-
-        const id = PREFIX + species + "_hatched_" + hash(signature);
-
-        const newData = {
-            ...data,
-            egg: false,
-            hatchedFrom: eggId,
-            traits: unique(data.traits || []),
-            inheritedTraits: unique(data.inheritedTraits || data.traits || []),
-            properties: unique(data.properties || []),
-            flavors: unique(data.flavors || []),
-            textures: unique(data.textures || []),
-            generation: Number(data.generation) || 1,
-            signature: signature
-        };
-
-        const info = SPECIES[species];
-
-        const definition = {
-            type: "life",
-            color: data.color || info.color,
-            shape: info.shape,
-            microorganism: true,
-            microorganismData: newData
-        };
-
-        if (!registerIngredient(id, definition)) {
-            alert("Organismo già schiuso o errore di registrazione.");
-            return;
-        }
-
-        alert(
-            "UOVO SCHIUSO!\n\n" +
-            "ID: " + id + "\n" +
-            "Colore: " + definition.color + "\n" +
-            "Tratti: " + newData.traits.join(", ") + "\n" +
-            "Proprietà: " + newData.properties.join(", ") + "\n" +
-            "Gusti: " + newData.flavors.join(", ")
-        );
-    }
-
-    const baseForms = {
-        microorganism_cell: {
-            type: "life",
-            shape: "microbe",
-            color: "#75C878"
-        },
-        microorganism_fungus: {
-            type: "life",
-            shape: "fungus",
-            color: "#A18ACB"
-        },
-        microorganism_algae: {
-            type: "life",
-            shape: "algae",
-            color: "#43B978"
-        },
-        microorganism_helix: {
-            type: "life",
-            shape: "double_helix",
-            color: "#59B7CB"
-        },
-        microorganism_embryo: {
-            type: "life",
-            shape: "embryo",
-            color: "#E4C878"
-        }
-    };
-
-    for (const id of Object.keys(baseForms)) {
-        if (getDefinition(id)) continue;
-
-        try {
-            addIngredient(id, baseForms[id]);
-        } catch (error) {
-            console.warn("[Microorganisms] Forma non registrata:", id, error);
-        }
-    }
-
-    try {
-        addTool("creator_of_microorganisms", {
-            func: function (placed) {
-                try {
-                    createFromPlaced(placed);
-                } catch (error) {
-                    console.error("[Microorganisms] Creazione fallita:", error);
-                    alert("Errore: " + (error.message || error));
-                }
-            },
-            shape: "microbe"
-        });
-    } catch (error) {
-        console.error("[Microorganisms] Impossibile registrare creator:", error);
-    }
-
-    try {
-        addTool("hatch_microorganism_egg", {
-            func: function (placed) {
-                try {
-                    hatchEgg(placed);
-                } catch (error) {
-                    console.error("[Microorganisms] Schiusa fallita:", error);
-                    alert("Errore: " + (error.message || error));
-                }
-            },
-            shape: "embryo"
-        });
-    } catch (error) {
-        console.error("[Microorganisms] Impossibile registrare hatch:", error);
-    }
-
-    console.log(
-        "[Microorganisms] v" + VERSION +
-        " caricato: genetica, colori, proprietà, gusti e mutazioni."
+    const temperature = Math.max(
+      -50,
+      Math.min(200, Number(tempRaw))
     );
-})();
 
+    const ingredients = readIngredients();
+
+    if (!ingredients) return;
+
+    const traitText = ask(
+      "Tratti aggiuntivi (scrivi gli ID separati da virgole).\n" +
+      "Lascia vuoto per nessun tratto manuale.\n\n" +
+      "Tratti disponibili:\n" +
+      Object.entries(TRAITS)
+        .map(([k, v]) => `${k} = ${v.label}`)
+        .join("\n"),
+      "fermentazione, crescita"
+    );
+
+    if (traitText === null) return;
+
+    const selectedTraits = parseTraits(traitText);
+    const ingredientEffects = deriveIngredientEffects(ingredients);
+
+    const allTraits = unique([
+      ...selectedTraits,
+      ...ingredientEffects.traits,
+      ...(mode === "caldo" ? ["termoresistenza"] : []),
+      ...(mode === "freddo" ? ["adattamento_al_freddo"] : []),
+      ...(mode === "stress"
+        ? ["adattamento", "stabilita_genetica"]
+        : [])
+    ]);
+
+    // Interazioni tra tratti: generano combinazioni speciali.
+    const combos = [];
+    const properties = [];
+
+    if (
+      allTraits.includes("fotosintesi") &&
+      allTraits.includes("bioluminescenza")
+    ) {
+      combos.push("fotoluminescenza");
+      properties.push("conversione luminosa combinata");
+    }
+
+    if (
+      allTraits.includes("fermentazione") &&
+      allTraits.includes("dolcezza")
+    ) {
+      combos.push("fermentazione_zuccherina");
+      properties.push("metabolismo zuccherino avanzato");
+    }
+
+    if (
+      allTraits.includes("termoresistenza") &&
+      allTraits.includes("resistenza_siccita")
+    ) {
+      combos.push("sopravvivenza_estrema");
+      properties.push("resistenza combinata caldo-siccità");
+    }
+
+    if (
+      allTraits.includes("biofilm") &&
+      allTraits.includes("capsula_protettiva")
+    ) {
+      combos.push("barriera_cellulare");
+      properties.push("barriera protettiva avanzata");
+    }
+
+    if (
+      allTraits.includes("riparazione_dna") &&
+      allTraits.includes("stabilita_genetica")
+    ) {
+      combos.push("genoma_stabile");
+      properties.push("genoma ad alta stabilità");
+    }
+
+    if (
+      allTraits.includes("fermentazione") &&
+      allTraits.includes("produzione_alcoli")
+    ) {
+      combos.push("fermentazione_aromatica");
+      properties.push("profilo fermentativo aromatico");
+    }
+
+    const treatmentRaw = ask(
+      "Trattamenti ricevuti (normale, affumicato, caramellato, innesto, restoration; separati da virgole):",
+      "normale"
+    );
+
+    if (treatmentRaw === null) return;
+
+    const treatments = unique(
+      treatmentRaw.split(",").map(slug)
+    );
+
+    if (treatments.includes("affumicato")) {
+      allTraits.push("aroma_tostato");
+    }
+
+    if (treatments.includes("caramellato")) {
+      allTraits.push("dolcezza");
+    }
+
+    if (treatments.includes("innesto")) {
+      allTraits.push("ricombinazione");
+    }
+
+    if (treatments.includes("restoration")) {
+      allTraits.push("stabilita_genetica");
+    }
+
+    const traits = unique(allTraits);
+
+    let quality =
+      species.base +
+      traits.reduce((s, t) => s + (TRAITS[t]?.q || 0), 0) +
+      combos.length * 7 +
+      Math.min(12, ingredients.length * 2);
+
+    if (cell !== species.cell) quality -= 3;
+    if (mode === "stress") quality += 4;
+    if (temperature < 0 || temperature > 80) quality -= 3;
+
+    quality = Math.max(1, Math.min(100, Math.round(quality)));
+
+    let value =
+      species.base * 0.55 +
+      ingredientEffects.value +
+      traits.reduce((s, t) => s + (TRAITS[t]?.v || 0), 0) +
+      combos.length * 12 +
+      ingredients.length * 2;
+
+    if (treatments.includes("affumicato")) value += 5;
+    if (treatments.includes("caramellato")) value += 6;
+    if (treatments.includes("innesto")) value += 8;
+
+    value = Math.max(
+      1,
+      Math.round(value * (0.65 + quality / 100))
+    );
+
+    const flavors = unique([
+      ...ingredientEffects.flavors,
+      ...traits.flatMap(t => TRAITS[t]?.f || []),
+      ...(treatments.includes("affumicato")
+        ? ["affumicato", "legnoso"]
+        : []),
+      ...(treatments.includes("caramellato")
+        ? ["caramellato", "tostato"]
+        : [])
+    ]);
+
+    const textures = unique(
+      traits.flatMap(t => TRAITS[t]?.t || [])
+    );
+
+    const traitColors = traits
+      .map(t => TRAITS[t]?.c)
+      .filter(Boolean);
+
+    const color = blend([
+      species.color,
+      ...ingredientEffects.colors,
+      ...traitColors
+    ]);
+
+    // Stessa combinazione di input = stessa firma genetica.
+    // Ogni singola produzione riceve comunque un ID distinto.
+    const canonical = JSON.stringify({
+      speciesId,
+      cell,
+      mode,
+      temperature,
+      ingredients: ingredients.map(slug).sort(),
+      traits: traits.slice().sort(),
+      treatments: treatments.slice().sort(),
+      combos: combos.slice().sort()
+    });
+
+    const geneticId = hash(canonical);
+
+    productionCounter += 1;
+
+    const serial =
+      Date.now().toString(36) +
+      "-" +
+      productionCounter.toString(36) +
+      "-" +
+      Math.random().toString(36).slice(2, 8);
+
+    const id =
+      "microorganism_" +
+      speciesId +
+      "_" +
+      geneticId +
+      "_" +
+      serial;
+
+    const data = {
+      version: VERSION,
+      id,
+      geneticId,
+      productionSerial: serial,
+      species: speciesId,
+      cellType: cell,
+      mode,
+      temperature,
+      ingredients,
+      traits,
+      combinations: combos,
+      properties,
+      flavors: flavors.length ? flavors : ["neutro"],
+      textures,
+      quality,
+      qualityLabel:
+        quality >= 90 ? "Leggendaria" :
+        quality >= 75 ? "Eccellente" :
+        quality >= 55 ? "Buona" :
+        quality >= 35 ? "Comune" :
+        "Bassa",
+      price: value,
+      estimatedCost: Math.max(1, Math.round(value * 0.35)),
+      color,
+      shape: species.shape,
+      generation: 1,
+      treatments,
+      parents: [],
+      egg: false,
+      signature: canonical
+    };
+
+    const description = [
+      `Specie: ${species.label}`,
+      `ID genetico: ${geneticId}`,
+      `Qualità: ${data.quality}/100 (${data.qualityLabel})`,
+      `Valore stimato: €${data.price}`,
+      `Colore: ${color}`,
+      `Tratti: ${traits.join(", ")}`,
+      `Gusti: ${data.flavors.join(", ")}`
+    ].join(" | ");
+
+    const definition = {
+      name: `${species.label} ${geneticId}`,
+      type: "life",
+      color,
+      shape: species.shape,
+      description,
+      microorganism: true,
+      microorganismData: data,
+      quality,
+      price: value
+    };
+
+    if (!createIngredient(id, definition)) {
+      alert(
+        "Il gioco non ha registrato il microrganismo. " +
+        "Controlla la console."
+      );
+      return;
+    }
+
+    registry[id] = data;
+    window.microorganismRegistry = registry;
+
+    window.dispatchEvent(
+      new CustomEvent("microorganism-created", {
+        detail: data
+      })
+    );
+
+    // Crea anche un uovo collegato al microrganismo genitore.
+    const eggId =
+      "microorganism_egg_" +
+      geneticId +
+      "_" +
+      serial;
+
+    const eggData = {
+      ...data,
+      id: eggId,
+      egg: true,
+      parentMicroorganism: id,
+      parents: [id],
+      inheritedTraits: [...traits],
+      generation: 2
+    };
+
+    const eggDef = {
+      name: `Uovo ${species.label} ${geneticId}`,
+      type: "egg",
+      color,
+      shape: "embryo",
+      description:
+        `Uovo di ${species.label}. ` +
+        `Qualità ereditaria ${quality}/100; ` +
+        `valore stimato €${value}.`,
+      microorganism: true,
+      microorganismEgg: true,
+      microorganismData: eggData,
+      quality,
+      price: value
+    };
+
+    if (createIngredient(eggId, eggDef)) {
+      registry[eggId] = eggData;
+    }
+
+    alert(
+      `MICRORGANISMO UNIVOCO CREATO\n\n` +
+      `ID produzione: ${id}\n` +
+      `ID genetico: ${geneticId}\n` +
+      `Specie: ${species.label}\n` +
+      `Colore: ${color}\n` +
+      `Qualità: ${quality}/100 (${data.qualityLabel})\n` +
+      `Prezzo stimato: €${value}\n` +
+      `Costo stimato: €${data.estimatedCost}\n\n` +
+      `Tratti:\n${traits.join(", ")}\n\n` +
+      `Combinazioni:\n${combos.join(", ") || "Nessuna"}\n\n` +
+      `Proprietà:\n${properties.join(", ") || "Nessuna combinazione speciale"}\n\n` +
+      `Gusti:\n${data.flavors.join(", ")}\n\n` +
+      `Consistenze:\n${textures.join(", ") || "cellulare"}\n\n` +
+      `Uovo: ${eggId}`
+    );
+  }
+
+  function showTraitDatabase() {
+    const lines = Object.entries(TRAITS).map(([id, t]) =>
+      `${id} — ${t.label} | qualità ${t.q >= 0 ? "+" : ""}${t.q} | valore +${t.v}`
+    );
+
+    alert(
+      "DATABASE TRATTI (" +
+      lines.length +
+      ")\n\n" +
+      lines.join("\n")
+    );
+  }
+
+  const toolDef = {
+    func: function () {
+      try {
+        createMicroorganism();
+      } catch (e) {
+        console.error(
+          "[Microorganisms] Errore creazione:",
+          e
+        );
+        alert("Errore: " + (e.message || e));
+      }
+    },
+    shape: "microbe"
+  };
+
+  try {
+    addTool(TOOL_ID, toolDef);
+  } catch (e) {
+    console.error(
+      "[Microorganisms] addTool fallito:",
+      e
+    );
+  }
+
+  try {
+    addTool("microorganism_trait_database", {
+      func: showTraitDatabase,
+      shape: "double_helix"
+    });
+  } catch (e) {
+    console.warn(
+      "[Microorganisms] Tool database tratti non registrato:",
+      e
+    );
+  }
+
+  console.log(
+    `[Microorganisms] v${VERSION} caricato. ` +
+    `Tratti disponibili: ${Object.keys(TRAITS).length}.`
+  );
+})();
