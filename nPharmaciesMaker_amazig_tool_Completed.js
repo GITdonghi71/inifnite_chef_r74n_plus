@@ -745,7 +745,7 @@
     name: drug.name,
     color: drug.color,
     type: "pill",
-    shape: "pill",
+    shape: "capsule",
     emoji: "💊",
     icon: "💊",
     description: drug.description,
