@@ -1,38 +1,33 @@
 
 /*
- * DrugMaker.js — v5.0
+ * DrugMaker.js v6.0
  * Infinite Chef
  *
- * Funzioni:
- * - Combina due microorganismi.
- * - Permette più trattamenti chimici.
- * - Permette 1 o 2 apparati industriali.
- * - Una combinazione canonica corrisponde a una sola pillola.
- * - L'ordine dei microorganismi, trattamenti e apparati non conta.
- * - Colore uniforme deterministico per ogni ricetta.
- * - Salvataggio delle ricette in localStorage.
- *
- * Integrazione prevista:
- * window.microorganismRegistry
- * window.addTool(...)
- * window.addIngredient(...)
+ * - Due microorganismi per ricetta.
+ * - Uno o più trattamenti.
+ * - Da uno a due apparati.
+ * - Stessa combinazione = stessa pillola.
+ * - Ordine dei componenti irrilevante.
+ * - Colore uniforme deterministico.
+ * - Salvataggio locale delle ricette.
+ * - Registrazione separata dei due tool.
  */
 
 (function () {
     "use strict";
 
-    const VERSION = "5.0";
-    const MOD_ID = "drug_maker";
-    const STORAGE_KEY = "drug_maker_v5";
+    const VERSION = "6.0";
+    const STORAGE_KEY = "drug_maker_v6";
 
-    if (window.__drugMakerV5Loaded) {
-        console.warn("[DrugMaker] Questa versione è già caricata.");
+    // Evita di inizializzare due volte questa versione.
+    if (window.__drugMakerV6Loaded) {
+        console.warn("[DrugMaker] v6.0 già caricata.");
         return;
     }
 
-    // ---------------------------------------------------------
-    // 1. CATALOGO DEI TRATTAMENTI
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // CATALOGO TRATTAMENTI
+    // --------------------------------------------------
 
     const TREATMENT_NAMES = [
         "Ossidazione",
@@ -170,9 +165,9 @@
         "Trattamento con enzimi"
     ];
 
-    // ---------------------------------------------------------
-    // 2. CATALOGO DEGLI APPARATI INDUSTRIALI
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // CATALOGO APPARATI
+    // --------------------------------------------------
 
     const APPARATUS_NAMES = [
         "Reattore chimico",
@@ -272,42 +267,9 @@
         "Unità di recupero solventi"
     ];
 
-    // ---------------------------------------------------------
-    // 3. CREAZIONE DEI CATALOGHI CON ID STABILI
-    // ---------------------------------------------------------
-
-    function slug(text) {
-        return String(text)
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "_")
-            .replace(/^_+|_+$/g, "");
-    }
-
-    function buildCatalog(names) {
-        const catalog = {};
-        const normalizedNames = {};
-
-        names.forEach(function (name) {
-            const id = slug(name);
-
-            if (!catalog[id]) {
-                catalog[id] = {
-                    id: id,
-                    name: name
-                };
-            }
-
-            normalizedNames[normalize(name)] = id;
-            normalizedNames[normalize(id)] = id;
-        });
-
-        return {
-            items: catalog,
-            names: normalizedNames
-        };
-    }
+    // --------------------------------------------------
+    // UTILITÀ E CATALOGHI
+    // --------------------------------------------------
 
     function normalize(value) {
         return String(value || "")
@@ -315,7 +277,32 @@
             .replace(/[\u0300-\u036f]/g, "")
             .toLowerCase()
             .trim()
-            .replace(/[\s-]+/g, "_");
+            .replace(/[^a-z0-9]+/g, "_")
+            .replace(/^_+|_+$/g, "");
+    }
+
+    function buildCatalog(names) {
+        const items = {};
+        const aliases = {};
+
+        names.forEach(function (name) {
+            const id = normalize(name);
+
+            if (!items[id]) {
+                items[id] = {
+                    id: id,
+                    name: name
+                };
+            }
+
+            aliases[normalize(name)] = id;
+            aliases[id] = id;
+        });
+
+        return {
+            items: items,
+            aliases: aliases
+        };
     }
 
     const treatmentCatalog = buildCatalog(TREATMENT_NAMES);
@@ -324,9 +311,9 @@
     const TREATMENTS = treatmentCatalog.items;
     const APPARATUS = apparatusCatalog.items;
 
-    // ---------------------------------------------------------
-    // 4. REGISTRY DEI MICROORGANISMI
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // REGISTRY
+    // --------------------------------------------------
 
     function getRegistry() {
         if (!window.microorganismRegistry) {
@@ -343,7 +330,6 @@
 
         registry.microorganisms =
             registry.microorganisms || {};
-
         registry.eggs = registry.eggs || {};
         registry.discoveries = registry.discoveries || {};
         registry.drugs = registry.drugs || {};
@@ -354,24 +340,24 @@
 
     function findMicroorganism(id) {
         const registry = getRegistry();
+
         if (!id) return null;
 
-        const direct = registry.microorganisms[id];
-        if (direct) return direct;
-
-        const wanted = String(id).trim();
+        if (registry.microorganisms[id]) {
+            return registry.microorganisms[id];
+        }
 
         const keys = Object.keys(registry.microorganisms);
 
         for (let i = 0; i < keys.length; i++) {
             const key = keys[i];
-            const microbe = registry.microorganisms[key];
+            const item = registry.microorganisms[key];
 
             if (
-                String(key) === wanted ||
-                String(microbe.id || "") === wanted
+                String(key) === String(id) ||
+                String(item.id || "") === String(id)
             ) {
-                return microbe;
+                return item;
             }
         }
 
@@ -387,54 +373,50 @@
             placed.ingredient_id,
             placed.microorganismId,
             placed.microorganism_id,
-            placed.type,
-            placed.name,
             placed.ingredient && placed.ingredient.id,
             placed.data && placed.data.id
         ];
 
         for (let i = 0; i < candidates.length; i++) {
-            const candidate = candidates[i];
+            const id = candidates[i];
 
             if (
-                candidate !== undefined &&
-                candidate !== null &&
-                findMicroorganism(String(candidate))
+                id !== undefined &&
+                id !== null &&
+                findMicroorganism(String(id))
             ) {
-                return String(candidate);
+                return String(id);
             }
         }
 
         return null;
     }
 
-    // ---------------------------------------------------------
-    // 5. NORMALIZZAZIONE DELLE SELEZIONI
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // SELEZIONE DI TRATTAMENTI E APPARATI
+    // --------------------------------------------------
 
     function parseSelections(input, catalog, label) {
-        const values = String(input || "")
+        const parts = String(input || "")
             .split(",")
-            .map(function (part) {
-                return part.trim();
+            .map(function (item) {
+                return item.trim();
             })
             .filter(Boolean);
 
         const result = [];
 
-        values.forEach(function (value) {
-            const id =
-                catalog.names[normalize(value)] ||
-                catalog.names[slug(value)];
+        parts.forEach(function (part) {
+            const id = catalog.aliases[normalize(part)];
 
             if (!id || !catalog.items[id]) {
                 throw new Error(
-                    'Voce "' + value + '" non riconosciuta per ' +
-                    label + "."
+                    'Voce non riconosciuta per ' +
+                    label + ': "' + part + '"'
                 );
             }
 
-            if (result.indexOf(id) === -1) {
+            if (!result.includes(id)) {
                 result.push(id);
             }
         });
@@ -442,37 +424,29 @@
         return result.sort();
     }
 
-    // ---------------------------------------------------------
-    // 6. CHIAVE CANONICA DELLA RICETTA
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // CHIAVE CANONICA
+    // --------------------------------------------------
 
-    function canonicalKey(
-        microorganismIds,
-        treatmentIds,
-        apparatusIds
-    ) {
-        const microbes = microorganismIds
-            .map(String)
-            .sort();
-
-        const treatments = Array.from(
-            new Set(treatmentIds.map(String))
-        ).sort();
-
-        const apparatus = Array.from(
-            new Set(apparatusIds.map(String))
-        ).sort();
-
+    function canonicalKey(microbes, treatments, apparatus) {
         return JSON.stringify({
-            microorganisms: microbes,
-            treatments: treatments,
-            apparatus: apparatus
+            microorganisms: Array.from(
+                new Set(microbes.map(String))
+            ).sort(),
+
+            treatments: Array.from(
+                new Set(treatments.map(String))
+            ).sort(),
+
+            apparatus: Array.from(
+                new Set(apparatus.map(String))
+            ).sort()
         });
     }
 
-    // ---------------------------------------------------------
-    // 7. HASH E ID DETERMINISTICO
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // HASH E ID
+    // --------------------------------------------------
 
     function hash32(text) {
         let hash = 2166136261;
@@ -489,9 +463,9 @@
         return "drug_" + hash32(key);
     }
 
-    // ---------------------------------------------------------
-    // 8. COLORE UNIFORME DETERMINISTICO
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // COLORE SOLIDO DETERMINISTICO
+    // --------------------------------------------------
 
     function hslToHex(h, s, l) {
         s /= 100;
@@ -523,23 +497,18 @@
     }
 
     function colorForRecipe(key) {
-        const hash = parseInt(hash32(key), 16);
-
-        // Saturazione e luminosità fisse:
-        // cambia la tonalità, ma il colore resta uniforme.
-        const hue = hash % 360;
+        const hue = parseInt(hash32(key), 16) % 360;
 
         return hslToHex(hue, 72, 48);
     }
 
-    // ---------------------------------------------------------
-    // 9. ARCHIVIO PERSISTENTE
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // SALVATAGGIO
+    // --------------------------------------------------
 
     function loadSavedRecipes() {
         try {
             const raw = window.localStorage.getItem(STORAGE_KEY);
-
             if (!raw) return {};
 
             const parsed = JSON.parse(raw);
@@ -549,7 +518,7 @@
                 : {};
         } catch (error) {
             console.warn(
-                "[DrugMaker] Impossibile leggere il salvataggio.",
+                "[DrugMaker] Lettura salvataggio fallita.",
                 error
             );
 
@@ -567,47 +536,45 @@
             );
         } catch (error) {
             console.warn(
-                "[DrugMaker] Impossibile salvare le ricette.",
+                "[DrugMaker] Salvataggio fallito.",
                 error
             );
         }
     }
 
-    // ---------------------------------------------------------
-    // 10. NOMI DELLE PILLOLE
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // NOMI
+    // --------------------------------------------------
 
-    function getMicrobeName(id) {
-        const microbe = findMicroorganism(id);
+    function microbeName(id) {
+        const item = findMicroorganism(id);
 
-        if (!microbe) return id;
-
-        return microbe.name || microbe.label || microbe.id || id;
+        return item
+            ? (item.name || item.label || item.id || id)
+            : id;
     }
 
     function makeDrugName(microbes, id) {
-        const first = getMicrobeName(microbes[0]);
-        const second = getMicrobeName(microbes[1]);
-
-        return "Pillola " + first + " + " + second +
+        return "Pillola " +
+            microbeName(microbes[0]) +
+            " + " +
+            microbeName(microbes[1]) +
             " [" + id.slice(-6) + "]";
     }
 
-    // ---------------------------------------------------------
-    // 11. REGISTRAZIONE DELL'INGREDIENTE NEL GIOCO
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // REGISTRAZIONE INGREDIENTE
+    // --------------------------------------------------
 
     function registerIngredient(drug) {
         if (typeof window.addIngredient !== "function") {
             console.warn(
-                "[DrugMaker] addIngredient non è disponibile."
+                "[DrugMaker] addIngredient non disponibile."
             );
             return;
         }
 
         try {
-            // L'icona viene lasciata al renderer standard del gioco.
-            // Il colore è un unico valore esadecimale.
             window.addIngredient(drug.id, {
                 name: drug.name,
                 color: drug.color,
@@ -620,33 +587,28 @@
             });
         } catch (error) {
             console.error(
-                "[DrugMaker] Registrazione ingrediente fallita:",
+                "[DrugMaker] Errore addIngredient:",
                 error
             );
         }
     }
 
-    // ---------------------------------------------------------
-    // 12. RICERCA E RIUTILIZZO DELLE RICETTE
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // TROVA RICETTA ESISTENTE
+    // --------------------------------------------------
 
     function findExistingDrug(key) {
         const registry = getRegistry();
+        const recipe = registry.drugRecipes[key];
 
-        if (registry.drugRecipes[key]) {
-            const recipe = registry.drugRecipes[key];
+        if (recipe && recipe.drugId) {
+            const found = registry.drugs[recipe.drugId];
 
-            if (recipe.drugId && registry.drugs[recipe.drugId]) {
-                return registry.drugs[recipe.drugId];
-            }
+            if (found) return found;
         }
 
-        if (savedRecipes[key]) {
-            const saved = savedRecipes[key];
-
-            if (saved.id) {
-                return saved;
-            }
+        if (savedRecipes[key] && savedRecipes[key].id) {
+            return savedRecipes[key];
         }
 
         const expectedId = idForKey(key);
@@ -658,9 +620,9 @@
         return null;
     }
 
-    // ---------------------------------------------------------
-    // 13. CREAZIONE O RIUTILIZZO DELLA PILLOLA
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // CREA O RIUTILIZZA PILLOLA
+    // --------------------------------------------------
 
     function createDrug(
         firstId,
@@ -687,7 +649,7 @@
 
         if (firstId === secondId) {
             throw new Error(
-                "Seleziona due microorganismi differenti."
+                "Servono due microorganismi differenti."
             );
         }
 
@@ -701,7 +663,7 @@
             new Set((apparatusIds || []).map(String))
         ).sort();
 
-        if (treatments.length === 0) {
+        if (!treatments.length) {
             throw new Error(
                 "Seleziona almeno un trattamento."
             );
@@ -709,23 +671,19 @@
 
         if (apparatus.length < 1 || apparatus.length > 2) {
             throw new Error(
-                "Devi selezionare uno o due apparati."
+                "Seleziona uno o due apparati."
             );
         }
 
         treatments.forEach(function (id) {
             if (!TREATMENTS[id]) {
-                throw new Error(
-                    "Trattamento non valido: " + id
-                );
+                throw new Error("Trattamento non valido: " + id);
             }
         });
 
         apparatus.forEach(function (id) {
             if (!APPARATUS[id]) {
-                throw new Error(
-                    "Apparato non valido: " + id
-                );
+                throw new Error("Apparato non valido: " + id);
             }
         });
 
@@ -735,7 +693,6 @@
             apparatus
         );
 
-        // Se la combinazione esiste, restituisci la stessa pillola.
         const existing = findExistingDrug(key);
 
         if (existing) {
@@ -754,31 +711,27 @@
             };
         }
 
-        // L'ID è deterministico: stesso insieme di componenti,
-        // stesso ID anche se cambia l'ordine di inserimento.
         const id = idForKey(key);
         const color = colorForRecipe(key);
 
-        const treatmentNames = treatments.map(function (treatmentId) {
-            return TREATMENTS[treatmentId].name;
+        const treatmentNames = treatments.map(function (itemId) {
+            return TREATMENTS[itemId].name;
         });
 
-        const apparatusNames = apparatus.map(function (apparatusId) {
-            return APPARATUS[apparatusId].name;
+        const apparatusNames = apparatus.map(function (itemId) {
+            return APPARATUS[itemId].name;
         });
-
-        const name = makeDrugName(microbes, id);
 
         const drug = {
             id: id,
-            name: name,
+            name: makeDrugName(microbes, id),
             color: color,
             type: "pill",
             shape: "pill",
             emoji: "💊",
 
             microorganisms: microbes,
-            microorganismNames: microbes.map(getMicrobeName),
+            microorganismNames: microbes.map(microbeName),
 
             treatments: treatments,
             treatmentNames: treatmentNames,
@@ -790,12 +743,11 @@
 
             description:
                 "Pillola ottenuta da " +
-                microbes.map(getMicrobeName).join(" + ") +
+                microbes.map(microbeName).join(" + ") +
                 ". Trattamenti: " +
                 treatmentNames.join(", ") +
                 ". Apparati: " +
-                apparatusNames.join(", ") +
-                ".",
+                apparatusNames.join(", ") + ".",
 
             createdAt: Date.now(),
             drugMakerVersion: VERSION
@@ -810,14 +762,13 @@
 
         registry.discoveries[id] = {
             id: id,
-            name: name,
+            name: drug.name,
             type: "drug",
             recipeKey: key
         };
 
         savedRecipes[key] = drug;
         persistRecipes();
-
         registerIngredient(drug);
 
         try {
@@ -829,15 +780,14 @@
                     }
                 })
             );
-        } catch (_) {
-            // L'evento è facoltativo.
+        } catch (error) {
+            // L'evento non è essenziale.
         }
 
         console.info(
-            "[DrugMaker] Nuova pillola:",
-            id,
-            color,
-            drug
+            "[DrugMaker] Creata:",
+            drug.id,
+            drug.color
         );
 
         return {
@@ -846,27 +796,24 @@
         };
     }
 
-    // ---------------------------------------------------------
-    // 14. FLUSSO INTERATTIVO DEL TOOL
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // FLUSSO DI CREAZIONE
+    // --------------------------------------------------
 
     function startCreation(placed) {
         const firstId = getClickedId(placed);
 
         if (!firstId) {
             alert(
-                "DrugMaker: clicca il tool mentre selezioni " +
-                "un microorganismo riconosciuto."
+                "Drug Maker: seleziona un microorganismo " +
+                "riconosciuto prima di avviare la creazione."
             );
             return;
         }
 
-        const firstMicrobe = findMicroorganism(firstId);
-
         const secondInput = window.prompt(
             "DRUG MAKER\n\n" +
-            "Primo microorganismo: " +
-            (firstMicrobe.name || firstId) +
+            "Primo microorganismo: " + microbeName(firstId) +
             "\n\nInserisci l'ID del secondo microorganismo:"
         );
 
@@ -875,29 +822,24 @@
         const secondId = secondInput.trim();
 
         if (!findMicroorganism(secondId)) {
-            alert(
-                "Secondo microorganismo non trovato.\n" +
-                "Controlla l'ID e riprova."
-            );
+            alert("Secondo microorganismo non trovato.");
             return;
         }
 
         if (secondId === firstId) {
-            alert(
-                "Devi scegliere due microorganismi differenti."
-            );
+            alert("Scegli due microorganismi differenti.");
             return;
         }
 
         const treatmentList = Object.keys(TREATMENTS)
             .map(function (id) {
-                return id + " = " + TREATMENTS[id].name;
+                return id + " — " + TREATMENTS[id].name;
             })
             .join("\n");
 
         const treatmentInput = window.prompt(
             "TRATTAMENTI\n\n" +
-            "Inserisci uno o più ID o nomi separati da virgole.\n\n" +
+            "Inserisci uno o più nomi o ID separati da virgole.\n\n" +
             treatmentList
         );
 
@@ -916,20 +858,20 @@
             return;
         }
 
-        if (treatments.length === 0) {
-            alert("Seleziona almeno un trattamento.");
+        if (!treatments.length) {
+            alert("Devi scegliere almeno un trattamento.");
             return;
         }
 
         const apparatusList = Object.keys(APPARATUS)
             .map(function (id) {
-                return id + " = " + APPARATUS[id].name;
+                return id + " — " + APPARATUS[id].name;
             })
             .join("\n");
 
         const apparatusInput = window.prompt(
             "APPARATI INDUSTRIALI\n\n" +
-            "Inserisci uno o due ID o nomi separati da virgole.\n\n" +
+            "Inserisci uno o due nomi o ID separati da virgole.\n\n" +
             apparatusList
         );
 
@@ -949,9 +891,7 @@
         }
 
         if (apparatus.length < 1 || apparatus.length > 2) {
-            alert(
-                "Devi scegliere uno o due apparati differenti."
-            );
+            alert("Scegli uno o due apparati differenti.");
             return;
         }
 
@@ -968,7 +908,8 @@
             alert(
                 (result.created
                     ? "NUOVA PILLOLA CREATA"
-                    : "COMBINAZIONE GIÀ SCOPERTA") +
+                    : "PILLOLA GIÀ ESISTENTE") +
+
                 "\n\nNome: " + drug.name +
                 "\nID: " + drug.id +
                 "\nColore: " + drug.color +
@@ -985,29 +926,29 @@
         }
     }
 
-    // ---------------------------------------------------------
-    // 15. REGISTRO DELLE PILLOLE SCOPERTE
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // REGISTRO PILLOLE
+    // --------------------------------------------------
 
     function getDrugs() {
         const registry = getRegistry();
-        const combined = {};
+        const all = {};
 
         Object.keys(savedRecipes).forEach(function (key) {
             const drug = savedRecipes[key];
 
             if (drug && drug.id) {
-                combined[drug.id] = drug;
+                all[drug.id] = drug;
             }
         });
 
         Object.keys(registry.drugs).forEach(function (id) {
-            combined[id] = registry.drugs[id];
+            all[id] = registry.drugs[id];
         });
 
-        return Object.keys(combined)
+        return Object.keys(all)
             .map(function (id) {
-                return combined[id];
+                return all[id];
             })
             .sort(function (a, b) {
                 return String(a.name).localeCompare(String(b.name));
@@ -1017,102 +958,108 @@
     function showRegistry() {
         const drugs = getDrugs();
 
-        if (drugs.length === 0) {
-            alert("Non hai ancora scoperto nessuna pillola.");
+        if (!drugs.length) {
+            alert("Nessuna pillola scoperta.");
             return;
         }
 
-        const text = drugs.map(function (drug, index) {
+        const output = drugs.map(function (drug, index) {
             return (
                 (index + 1) + ". " + drug.name +
-                "\n   ID: " + drug.id +
-                "\n   Colore: " + drug.color +
-                "\n   Trattamenti: " +
+                "\nID: " + drug.id +
+                "\nColore: " + drug.color +
+                "\nTrattamenti: " +
                 (drug.treatmentNames || []).join(", ") +
-                "\n   Apparati: " +
+                "\nApparati: " +
                 (drug.apparatusNames || []).join(", ")
             );
         }).join("\n\n");
 
         alert(
-            "REGISTRO DRUG MAKER\n\n" +
-            "Pillole registrate: " + drugs.length +
-            "\n\n" + text
+            "REGISTRO DRUG MAKER\n" +
+            "Pillole: " + drugs.length +
+            "\n\n" + output
         );
     }
 
-    // ---------------------------------------------------------
-    // 16. REGISTRAZIONE DEI TOOL
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // REGISTRAZIONE TOOL
+    // --------------------------------------------------
 
-    if (typeof window.addTool === "function") {
-        window.addTool(MOD_ID, {
-            name: "Drug Maker",
-            shape: "pill",
-            func: function (placed) {
-                startCreation(placed);
-            }
-        });
+    function registerTools() {
+        if (typeof window.addTool !== "function") {
+            console.error(
+                "[DrugMaker] window.addTool non disponibile. " +
+                "Carica DrugMaker.js dopo il sistema dei tool."
+            );
+            return false;
+        }
 
-        window.addTool("drug_maker_registry", {
-            name: "Registro pillole",
-            shape: "pill",
-            func: function () {
-                showRegistry();
-            }
-        });
-    } else {
-        console.warn(
-            "[DrugMaker] window.addTool non è disponibile."
-        );
+        try {
+            window.addTool("drug_maker", {
+                name: "Drug Maker",
+                shape: "microbe",
+                func: function (placed) {
+                    startCreation(placed);
+                }
+            });
+
+            window.addTool("drug_maker_registry", {
+                name: "Drug Maker Registry",
+                shape: "microbe",
+                func: function () {
+                    showRegistry();
+                }
+            });
+
+            console.info("[DrugMaker] Tool registrati.");
+            return true;
+        } catch (error) {
+            console.error(
+                "[DrugMaker] Errore durante la registrazione dei tool:",
+                error
+            );
+            return false;
+        }
     }
 
-    // ---------------------------------------------------------
-    // 17. API PUBBLICA PER ALTRE MOD
-    // ---------------------------------------------------------
+    // --------------------------------------------------
+    // API PUBBLICA
+    // --------------------------------------------------
 
     window.DrugMaker = {
         version: VERSION,
-
         treatments: TREATMENTS,
         apparatus: APPARATUS,
 
         createDrug: createDrug,
-
-        getDrug: function (id) {
-            const registry = getRegistry();
-
-            return registry.drugs[id] || null;
-        },
-
         getDrugs: getDrugs,
-
-        getRecipeId: function (
-            microorganismIds,
-            treatmentIds,
-            apparatusIds
-        ) {
-            const key = canonicalKey(
-                microorganismIds,
-                treatmentIds,
-                apparatusIds
-            );
-
-            return idForKey(key);
-        },
-
+        showRegistry: showRegistry,
         colorForRecipe: colorForRecipe,
 
-        showRegistry: showRegistry
+        getDrug: function (id) {
+            return getRegistry().drugs[id] || null;
+        },
+
+        getRecipeId: function (microbes, treatments, apparatus) {
+            return idForKey(
+                canonicalKey(microbes, treatments, apparatus)
+            );
+        },
+
+        registerTools: registerTools
     };
 
-    window.__drugMakerV5Loaded = true;
+    // Flag impostato solo dopo aver preparato l'API.
+    window.__drugMakerV6Loaded = true;
+
+    // Registra i tool dopo aver definito tutte le funzioni.
+    registerTools();
 
     console.info(
-        "[DrugMaker] v" + VERSION +
-        " caricata. Trattamenti: " +
-        Object.keys(TREATMENTS).length +
-        "; apparati: " +
-        Object.keys(APPARATUS).length + "."
+        "[DrugMaker] v" + VERSION + " inizializzata. " +
+        "Trattamenti: " + Object.keys(TREATMENTS).length +
+        "; apparati: " + Object.keys(APPARATUS).length
     );
 })();
+
