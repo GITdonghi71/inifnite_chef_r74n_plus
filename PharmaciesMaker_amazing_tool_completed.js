@@ -742,17 +742,18 @@
         }
 
         const ingredient = {
-            name: drug.name,
-            color: drug.color,
-            type: "pill",
-            shape: "pill",
-            emoji: "💊",
-            description: drug.description,
-            microorganisms: drug.microorganisms.slice(),
-            treatments: drug.treatments.slice(),
-            apparatus: drug.apparatus.slice(),
-            drugMakerId: drug.id
-        };
+    name: drug.name,
+    color: drug.color,
+    type: "pill",
+    shape: "pill",
+    emoji: "💊",
+    icon: "💊",
+    description: drug.description,
+    microorganisms: drug.microorganisms.slice(),
+    treatments: drug.treatments.slice(),
+    apparatus: drug.apparatus.slice(),
+    drugMakerId: drug.id
+};
 
         try {
             window.addIngredient(drug.id, ingredient);
