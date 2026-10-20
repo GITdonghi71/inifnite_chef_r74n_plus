@@ -3,27 +3,27 @@
  * MendelSimulator.js
  * Infinite Chef R74n Plus
  *
- * Versione 2.0 - genetica procedurale
+ * Versione 2.1 - genetica procedurale
  *
- * Funzioni:
- * - Incroci deterministici e simmetrici: A+B = B+A.
- * - Un solo risultato persistente per ogni coppia di genitori.
- * - Ereditarietà dei tratti riconosciuti dal registro.
- * - Mutazioni procedurali, sinergie e rarità emergenti.
- * - Nomi, colori, descrizioni e caratteristiche deterministici.
- * - Salvataggio e ripristino degli ibridi.
- * - Tentativo di pulizia della ricerca dopo Ctrl+R.
+ * MODIFICHE:
+ * - Gli ibridi delle sessioni precedenti non vengono
+ *   aggiunti automaticamente alla barra ingredienti.
+ * - Gli incroci scoperti rimangono salvati in localStorage.
+ * - A+B = B+A.
+ * - Un solo risultato persistente per coppia.
+ * - Genetica, mutazioni, sinergie e rarità deterministiche.
+ * - Pulizia della ricerca dopo Ctrl+R.
  *
  * Dipendenze:
  * - window.addIngredient
  * - window.addTool
- * - window.microorganismRegistry (creato se assente)
+ * - window.microorganismRegistry
  */
 
 (function () {
     "use strict";
 
-    const VERSION = "2.0";
+    const VERSION = "2.1";
     const TOOL_ID = "mendel_simulator";
     const STORAGE_KEY = "mendel_simulator_hybrids_v1";
     const RELOAD_SEARCH_KEY = "mendel_clear_search_after_reload";
@@ -52,9 +52,15 @@
     function loadHybrids() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
-            return raw ? JSON.parse(raw) : {};
+            const data = raw ? JSON.parse(raw) : {};
+
+            return data && typeof data === "object" &&
+                !Array.isArray(data) ? data : {};
         } catch (error) {
-            console.warn("[MendelSimulator] Storage non leggibile.", error);
+            console.warn(
+                "[MendelSimulator] Storage non leggibile.",
+                error
+            );
             return {};
         }
     }
@@ -63,17 +69,22 @@
 
     function saveHybrids() {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(hybrids));
+            localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify(hybrids)
+            );
             return true;
         } catch (error) {
-            console.warn("[MendelSimulator] Salvataggio fallito.", error);
+            console.warn(
+                "[MendelSimulator] Salvataggio fallito.",
+                error
+            );
             return false;
         }
     }
 
     // ---------------------------------------------------------
     // HASH E CASUALITÀ DETERMINISTICA
-    // Nessuna casualità diversa a ogni esecuzione.
     // ---------------------------------------------------------
 
     function hash(value) {
@@ -94,7 +105,10 @@
 
     function choose(list, seed) {
         if (!list || !list.length) return "";
-        return list[Math.floor(random01(seed) * list.length)];
+
+        return list[
+            Math.floor(random01(seed) * list.length)
+        ];
     }
 
     function unique(list) {
@@ -112,7 +126,10 @@
     }
 
     function combinationKey(idA, idB) {
-        return [normalizeId(idA), normalizeId(idB)]
+        return [
+            normalizeId(idA),
+            normalizeId(idB)
+        ]
             .sort()
             .map(encodeURIComponent)
             .join("::");
@@ -130,7 +147,10 @@
     function getId(item) {
         if (item === null || item === undefined) return "";
 
-        if (typeof item === "string" || typeof item === "number") {
+        if (
+            typeof item === "string" ||
+            typeof item === "number"
+        ) {
             return normalizeId(item);
         }
 
@@ -144,7 +164,10 @@
         ];
 
         for (const field of fields) {
-            if (item[field] != null && String(item[field]).trim()) {
+            if (
+                item[field] != null &&
+                String(item[field]).trim()
+            ) {
                 return normalizeId(item[field]);
             }
         }
@@ -156,6 +179,7 @@
         id = normalizeId(id);
         if (!id) return null;
 
+        // Ingredienti originali e microorganismi già registrati.
         if (registry.microorganisms[id]) {
             return registry.microorganisms[id];
         }
@@ -184,7 +208,10 @@
                 if (store[id]) return store[id];
 
                 for (const key of Object.keys(store)) {
-                    if (key === id || getId(store[key]) === id) {
+                    if (
+                        key === id ||
+                        getId(store[key]) === id
+                    ) {
                         return store[key];
                     }
                 }
@@ -196,7 +223,9 @@
 
     function getTraits(id, ingredient) {
         const source =
-            registry.microorganisms[id] || ingredient || {};
+            registry.microorganisms[id] ||
+            ingredient ||
+            {};
 
         const rawTraits = Array.isArray(source.traits)
             ? source.traits
@@ -204,22 +233,35 @@
 
         return unique(rawTraits.map(function (trait) {
             if (typeof trait === "string") return trait;
+
             return trait && trait.id ? trait.id : "";
-        })).filter(function (traitId) {
-            return !!registry.traits[traitId];
-        }).sort();
+        }))
+            .filter(function (traitId) {
+                return !!registry.traits[traitId];
+            })
+            .sort();
     }
 
     function getParentName(item, id) {
         return String(
-            item && (item.name || item.displayName || item.label)
-                ? (item.name || item.displayName || item.label)
+            item && (
+                item.name ||
+                item.displayName ||
+                item.label
+            )
+                ? (
+                    item.name ||
+                    item.displayName ||
+                    item.label
+                )
                 : id
         );
     }
 
     function getArray(item, key) {
-        return Array.isArray(item && item[key]) ? item[key] : [];
+        return Array.isArray(item && item[key])
+            ? item[key]
+            : [];
     }
 
     // ---------------------------------------------------------
@@ -233,7 +275,12 @@
 
         if (match) {
             const n = parseInt(match[1], 16);
-            return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+
+            return [
+                (n >> 16) & 255,
+                (n >> 8) & 255,
+                n & 255
+            ];
         }
 
         match = color.match(/^#([0-9a-f]{3})$/i);
@@ -251,16 +298,25 @@
         const a = parseColor(colorA) || [100, 180, 130];
         const b = parseColor(colorB) || [100, 150, 210];
 
-        const mutation = random01(seed + "|pigment") > 0.72;
+        const mutation =
+            random01(seed + "|pigment") > 0.72;
+
         const shift = mutation
-            ? Math.floor(random01(seed + "|shift") * 31) - 15
+            ? Math.floor(
+                random01(seed + "|shift") * 31
+            ) - 15
             : 0;
 
         return "#" + a.map(function (value, index) {
-            const mixed = Math.max(0, Math.min(
-                255,
-                Math.round((value + b[index]) / 2 + shift)
-            ));
+            const mixed = Math.max(
+                0,
+                Math.min(
+                    255,
+                    Math.round(
+                        (value + b[index]) / 2 + shift
+                    )
+                )
+            );
 
             return mixed.toString(16).padStart(2, "0");
         }).join("");
@@ -268,17 +324,15 @@
 
     // ---------------------------------------------------------
     // GENETICA DETERMINISTICA
-    //
-    // Il modello è una simulazione di gioco, non un modello
-    // biologico reale.
+    // Modello simulato per il gioco, non biologico reale.
     // ---------------------------------------------------------
 
     function transmittedAllele(hasTrait, seed, parentNumber) {
         if (!hasTrait) return "t";
 
-        return hash(seed + "|parent|" + parentNumber) % 2 === 0
-            ? "T"
-            : "t";
+        return hash(
+            seed + "|parent|" + parentNumber
+        ) % 2 === 0 ? "T" : "t";
     }
 
     function crossTrait(hasA, hasB, seed) {
@@ -297,7 +351,10 @@
     }
 
     function inheritTraits(traitsA, traitsB, key) {
-        const allTraits = unique(traitsA.concat(traitsB)).sort();
+        const allTraits = unique(
+            traitsA.concat(traitsB)
+        ).sort();
+
         const expressed = [];
         const genotypes = {};
 
@@ -322,19 +379,23 @@
     }
 
     // ---------------------------------------------------------
-    // SINERGIA E MUTAZIONI EMERGENTI
-    //
-    // Non esiste un elenco di coppie speciali.
-    // Il risultato dipende dagli ID, dai tratti e dalle
-    // proprietà dei genitori.
+    // SINERGIA
     // ---------------------------------------------------------
 
-    function calculateSynergy(parentA, parentB, traitsA, traitsB, key) {
+    function calculateSynergy(
+        parentA,
+        parentB,
+        traitsA,
+        traitsB,
+        key
+    ) {
         const overlap = traitsA.filter(function (trait) {
             return traitsB.includes(trait);
         }).length;
 
-        const differences = unique(traitsA.concat(traitsB)).length - overlap;
+        const differences =
+            unique(traitsA.concat(traitsB)).length -
+            overlap;
 
         const colorA = parseColor(parentA.color);
         const colorB = parseColor(parentB.color);
@@ -342,16 +403,23 @@
         let colorDistance = 0;
 
         if (colorA && colorB) {
-            colorDistance = colorA.reduce(function (sum, value, index) {
-                return sum + Math.abs(value - colorB[index]);
-            }, 0) / 765;
+            colorDistance = colorA.reduce(
+                function (sum, value, index) {
+                    return sum +
+                        Math.abs(value - colorB[index]);
+                },
+                0
+            ) / 765;
         }
 
         const qualityA = Number(parentA.quality || 5);
         const qualityB = Number(parentB.quality || 5);
-        const qualityDifference = Math.abs(qualityA - qualityB) / 10;
 
-        const seedFactor = random01(key + "|synergy") * 0.35;
+        const qualityDifference =
+            Math.abs(qualityA - qualityB) / 10;
+
+        const seedFactor =
+            random01(key + "|synergy") * 0.35;
 
         const score =
             overlap * 0.12 +
@@ -368,61 +436,84 @@
         };
     }
 
-    function generateMutations(key, traitsA, traitsB, synergy) {
+    // ---------------------------------------------------------
+    // MUTAZIONI PROCEDURALI
+    // ---------------------------------------------------------
+
+    function generateMutations(
+        key,
+        traitsA,
+        traitsB,
+        synergy
+    ) {
         const mutations = [];
+
         const shared = traitsA.filter(function (trait) {
             return traitsB.includes(trait);
         });
 
-        const distinct = unique(traitsA.concat(traitsB));
+        const distinct = unique(
+            traitsA.concat(traitsB)
+        );
 
-        // La probabilità è deterministica per ogni incrocio.
         const mutationChance = Math.min(
             0.82,
-            0.12 + synergy.score * 0.50 +
+            0.12 +
+            synergy.score * 0.50 +
             distinct.length * 0.025
         );
 
-        if (random01(key + "|mutation-check") < mutationChance) {
+        if (
+            random01(key + "|mutation-check") <
+            mutationChance
+        ) {
             mutations.push({
-                id: "mutation_" + hash(key + "|m1").toString(16),
+                id: "mutation_" +
+                    hash(key + "|m1").toString(16),
                 type: "adaptive",
                 strength: 1 + Math.floor(
                     random01(key + "|strength") * 3
                 ),
-                description: "Mutazione emersa durante l'incrocio."
+                description:
+                    "Mutazione emersa durante l'incrocio."
             });
         }
 
-        // Sinergia tra tratti condivisi.
         if (
             shared.length > 0 &&
             random01(key + "|synergy-mutation") <
-                Math.min(0.75, 0.18 + synergy.score * 0.55)
+            Math.min(
+                0.75,
+                0.18 + synergy.score * 0.55
+            )
         ) {
             mutations.push({
-                id: "mutation_" + hash(key + "|m2").toString(16),
+                id: "mutation_" +
+                    hash(key + "|m2").toString(16),
                 type: "synergy",
                 strength: 1 + Math.floor(
-                    random01(key + "|synergy-strength") * 4
+                    random01(
+                        key + "|synergy-strength"
+                    ) * 4
                 ),
                 description:
                     "Interazione emergente tra caratteristiche condivise."
             });
         }
 
-        // Divergenza genetica: una combinazione molto diversa
-        // può produrre una mutazione aggiuntiva.
         if (
             distinct.length >= 4 &&
             random01(key + "|divergence") <
-                Math.min(0.60, distinct.length * 0.07)
+            Math.min(0.60, distinct.length * 0.07)
         ) {
             mutations.push({
-                id: "mutation_" + hash(key + "|m3").toString(16),
+                id: "mutation_" +
+                    hash(key + "|m3").toString(16),
                 type: "divergent",
                 strength: 1 + Math.floor(
-                    random01(key + "|divergent-strength") * 5
+                    random01(
+                        key + "|divergent-strength"
+                    ) * 5
                 ),
                 description:
                     "Mutazione divergente dovuta alla diversità genetica."
@@ -432,10 +523,22 @@
         return mutations;
     }
 
-    function calculateRarity(synergy, mutations, traitCount, key) {
-        const mutationStrength = mutations.reduce(function (sum, mutation) {
-            return sum + mutation.strength;
-        }, 0);
+    // ---------------------------------------------------------
+    // RARITÀ
+    // ---------------------------------------------------------
+
+    function calculateRarity(
+        synergy,
+        mutations,
+        traitCount,
+        key
+    ) {
+        const mutationStrength = mutations.reduce(
+            function (sum, mutation) {
+                return sum + mutation.strength;
+            },
+            0
+        );
 
         const score = Math.min(
             100,
@@ -456,14 +559,22 @@
         else if (score >= 34) rarity = "Raro";
         else if (score >= 20) rarity = "Non comune";
 
-        return { score: score, rarity: rarity };
+        return {
+            score: score,
+            rarity: rarity
+        };
     }
 
     // ---------------------------------------------------------
-    // IDENTITÀ PROCEDURALE
+    // NOMI E DESCRIZIONI
     // ---------------------------------------------------------
 
-    function generateName(parentA, parentB, rarity, key) {
+    function generateName(
+        parentA,
+        parentB,
+        rarity,
+        key
+    ) {
         const prefixes = [
             "Neo", "Xeno", "Astra", "Vitra", "Cryo",
             "Luma", "Umbra", "Aero", "Myco", "Bio",
@@ -476,13 +587,15 @@
             "core", "strain", "pulse", "bloom", "veil"
         ];
 
-        const prefix = choose(prefixes, key + "|name-prefix");
-        const suffix = choose(suffixes, key + "|name-suffix");
+        const prefix = choose(
+            prefixes,
+            key + "|name-prefix"
+        );
 
-        const names = [
-            getParentName(parentA, "A"),
-            getParentName(parentB, "B")
-        ].sort();
+        const suffix = choose(
+            suffixes,
+            key + "|name-suffix"
+        );
 
         return prefix + suffix + " [" + rarity + "]";
     }
@@ -507,8 +620,10 @@
                 " (" + rarity.score + "/100).",
             "Sinergia genetica: " +
                 Math.round(synergy.score * 100) + "/100.",
-            "Tratti riconosciuti espressi: " + traits.length + ".",
-            "Mutazioni emergenti: " + mutations.length + "."
+            "Tratti riconosciuti espressi: " +
+                traits.length + ".",
+            "Mutazioni emergenti: " +
+                mutations.length + "."
         ];
 
         if (mutations.length) {
@@ -540,8 +655,6 @@
             textures: hybrid.textures,
             description: hybrid.description,
 
-            // Metadati personalizzati della mod.
-            // Il gioco può ignorare i campi che non conosce.
             mendel: {
                 version: VERSION,
                 parents: hybrid.parents,
@@ -555,35 +668,25 @@
         });
     }
 
-    function restoreHybrid(hybrid) {
-        if (!hybrid || !hybrid.id) return false;
-
-        registry.microorganisms[hybrid.id] = hybrid;
-
-        try {
-            addHybridIngredient(hybrid);
-            return true;
-        } catch (error) {
-            console.warn(
-                "[MendelSimulator] Ripristino fallito:",
-                hybrid.id,
-                error
-            );
-            return false;
-        }
-    }
+    // ---------------------------------------------------------
+    // INCROCIO
+    // ---------------------------------------------------------
 
     function registerHybrid(idA, idB) {
         idA = normalizeId(idA);
         idB = normalizeId(idB);
 
         if (!idA || !idB) {
-            window.alert("Seleziona due ingredienti validi.");
+            window.alert(
+                "Seleziona due ingredienti validi."
+            );
             return null;
         }
 
         if (idA === idB) {
-            window.alert("Seleziona due ID differenti.");
+            window.alert(
+                "Seleziona due ID differenti."
+            );
             return null;
         }
 
@@ -597,18 +700,17 @@
             return null;
         }
 
-        // Ordine canonico per rendere A+B identico a B+A.
+        // Ordine canonico: A+B equivale a B+A.
         const ids = [idA, idB].sort();
+
         const parent1 = getIngredient(ids[0]);
         const parent2 = getIngredient(ids[1]);
 
         const key = combinationKey(ids[0], ids[1]);
-        const hybridId = makeHybridId(key);
 
-        // Se già scoperto, restituisce sempre il risultato originale.
+        // Un incrocio già scoperto non viene registrato di nuovo.
+        // IMPORTANTE: non usare restoreHybrid() qui.
         if (hybrids[key]) {
-            restoreHybrid(hybrids[key]);
-
             window.alert(
                 "Incrocio già scoperto!\n\n" +
                 hybrids[key].name + "\n" +
@@ -622,7 +724,11 @@
         const traitsA = getTraits(ids[0], parent1);
         const traitsB = getTraits(ids[1], parent2);
 
-        const inheritance = inheritTraits(traitsA, traitsB, key);
+        const inheritance = inheritTraits(
+            traitsA,
+            traitsB,
+            key
+        );
 
         const synergy = calculateSynergy(
             parent1,
@@ -665,40 +771,49 @@
         const qualityA = Number(parent1.quality || 5);
         const qualityB = Number(parent2.quality || 5);
 
-        const quality = Math.max(1, Math.min(
-            10,
-            Math.round(
-                (qualityA + qualityB) / 2 +
-                mutations.length * 0.25
+        const quality = Math.max(
+            1,
+            Math.min(
+                10,
+                Math.round(
+                    (qualityA + qualityB) / 2 +
+                    mutations.length * 0.25
+                )
             )
-        ));
+        );
 
         const valueA = Number(parent1.value || 1);
         const valueB = Number(parent2.value || 1);
 
-        const value = Math.max(1, Math.round(
-            ((valueA + valueB) / 2) *
-            (1 + rarity.score / 100)
-        ));
+        const value = Math.max(
+            1,
+            Math.round(
+                ((valueA + valueB) / 2) *
+                (1 + rarity.score / 100)
+            )
+        );
 
         const hybrid = {
-            id: hybridId,
+            id: makeHybridId(key),
+
             name: generateName(
                 parent1,
                 parent2,
                 rarity.rarity,
                 key
             ),
+
             type: "microbe",
             species: "hybrid",
             speciesName: "Ibrido procedurale",
             shape: "microbe",
+
             color: color,
             innerColor: color,
+
             quality: quality,
             value: value,
 
-            // Solo ID di tratti che esistono nel registro.
             traits: inheritance.traits,
             genotypes: inheritance.genotypes,
 
@@ -710,14 +825,15 @@
 
             rarity: rarity.rarity,
             rarityScore: rarity.score,
+
             mutations: mutations,
             synergy: synergy,
 
-            // Questi metadati descrivono le mutazioni.
-            // Non sono automaticamente tratti nativi del gioco.
-            specialTraits: mutations.map(function (mutation) {
-                return mutation.id;
-            }),
+            specialTraits: mutations.map(
+                function (mutation) {
+                    return mutation.id;
+                }
+            ),
 
             description: generateDescription(
                 parent1,
@@ -732,12 +848,13 @@
             createdAt: Date.now()
         };
 
-        // Salva prima di chiamare l'API del gioco.
+        // Memorizza il risultato senza ripristinare automaticamente
+        // gli ibridi salvati durante le sessioni precedenti.
         hybrids[key] = hybrid;
-        registry.microorganisms[hybridId] = hybrid;
 
         const saved = saveHybrids();
 
+        // Registra l'ibrido nella sessione corrente.
         try {
             addHybridIngredient(hybrid);
         } catch (error) {
@@ -755,17 +872,25 @@
             return null;
         }
 
+        // Disponibile nel registro durante la sessione corrente.
+        registry.microorganisms[hybrid.id] = hybrid;
+
         try {
-            window.dispatchEvent(new CustomEvent("mendelHybridCreated", {
-                detail: {
-                    hybrid: hybrid,
-                    parents: ids.slice(),
-                    combinationKey: key
-                }
-            }));
+            window.dispatchEvent(
+                new CustomEvent("mendelHybridCreated", {
+                    detail: {
+                        hybrid: hybrid,
+                        parents: ids.slice(),
+                        combinationKey: key
+                    }
+                })
+            );
         } catch (_) {}
 
-        console.info("[MendelSimulator] Nuova scoperta:", hybrid);
+        console.info(
+            "[MendelSimulator] Nuova scoperta:",
+            hybrid
+        );
 
         window.alert(
             "NUOVO IBRIDO SCOPERTO!\n\n" +
@@ -773,11 +898,14 @@
             "Rarità: " + hybrid.rarity + "\n" +
             "Punteggio: " + hybrid.rarityScore + "/100\n\n" +
             "Genitori:\n" + ids[0] + "\n" + ids[1] + "\n\n" +
-            "Tratti espressi: " + hybrid.traits.length + "\n" +
-            "Mutazioni emergenti: " + hybrid.mutations.length + "\n" +
+            "Tratti espressi: " +
+                hybrid.traits.length + "\n" +
+            "Mutazioni emergenti: " +
+                hybrid.mutations.length + "\n" +
             "Qualità: " + hybrid.quality + "/10\n" +
             "Valore: " + hybrid.value + "\n\n" +
-            "Salvataggio: " + (saved ? "completato" : "fallito")
+            "Salvataggio: " +
+                (saved ? "completato" : "fallito")
         );
 
         return hybrid;
@@ -805,12 +933,16 @@
             const clickedId = getId(placed);
 
             if (!clickedId) {
-                window.alert("Impossibile leggere l'ID selezionato.");
+                window.alert(
+                    "Impossibile leggere l'ID selezionato."
+                );
                 return;
             }
 
             if (!getIngredient(clickedId)) {
-                window.alert("Ingrediente non trovato: " + clickedId);
+                window.alert(
+                    "Ingrediente non trovato: " + clickedId
+                );
                 return;
             }
 
@@ -837,6 +969,7 @@
             const idB = clickedId;
 
             firstParentId = null;
+
             registerHybrid(idA, idB);
         },
 
@@ -846,13 +979,14 @@
     });
 
     // ---------------------------------------------------------
-    // RIPRISTINO DEGLI IBRIDI
+    // NESSUN RIPRISTINO AUTOMATICO DEGLI IBRIDI PRECEDENTI
+    //
+    // Non chiamare restoreHybrid() al caricamento.
+    // Questo evita che la mod reinserisca gli ibridi salvati
+    // nella barra degli ingredienti dopo Ctrl+R.
+    //
+    // Il registro persistente resta disponibile tramite le API.
     // ---------------------------------------------------------
-
-    Object.keys(hybrids).forEach(function (key) {
-        const hybrid = hybrids[key];
-        if (hybrid) restoreHybrid(hybrid);
-    });
 
     // ---------------------------------------------------------
     // API PUBBLICA
@@ -864,13 +998,17 @@
         cross: registerHybrid,
 
         getHybrid: function (idA, idB) {
-            return hybrids[combinationKey(idA, idB)] || null;
+            return hybrids[
+                combinationKey(idA, idB)
+            ] || null;
         },
 
         listHybrids: function () {
-            return Object.keys(hybrids).map(function (key) {
-                return hybrids[key];
-            });
+            return Object.keys(hybrids).map(
+                function (key) {
+                    return hybrids[key];
+                }
+            );
         },
 
         count: function () {
@@ -878,12 +1016,19 @@
         },
 
         hasHybrid: function (idA, idB) {
-            return !!hybrids[combinationKey(idA, idB)];
+            return !!hybrids[
+                combinationKey(idA, idB)
+            ];
         },
 
         getMutations: function (idA, idB) {
-            const hybrid = hybrids[combinationKey(idA, idB)];
-            return hybrid ? hybrid.mutations.slice() : [];
+            const hybrid = hybrids[
+                combinationKey(idA, idB)
+            ];
+
+            return hybrid
+                ? hybrid.mutations.slice()
+                : [];
         },
 
         getDiscoveriesByRarity: function (rarity) {
@@ -896,8 +1041,7 @@
                 });
         },
 
-        // Cancella solo il registro degli ibridi della mod.
-        // Non viene eseguito automaticamente con Ctrl+R.
+        // Cancella tutti i dati salvati dalla mod.
         clearHybrids: function () {
             hybrids = {};
 
@@ -913,9 +1057,6 @@
 
     // ---------------------------------------------------------
     // PULIZIA DELLA RICERCA DOPO CTRL+R
-    //
-    // Non cancella gli ibridi salvati.
-    // Funziona solo se i campi sono accessibili nel DOM.
     // ---------------------------------------------------------
 
     function isSearchField(element) {
@@ -948,8 +1089,12 @@
             element.getAttribute("data-testid")
         ].join(" ").toLowerCase();
 
-        return /search|cerca|ricerca|ingredient-filter/.test(descriptor) ||
-            type === "search";
+        return (
+            /search|cerca|ricerca|ingredient-filter/.test(
+                descriptor
+            ) ||
+            type === "search"
+        );
     }
 
     function clearSearchFields() {
@@ -964,26 +1109,33 @@
                 if (element.isContentEditable) {
                     element.textContent = "";
                 } else {
-                    const prototype = element.tagName === "TEXTAREA"
-                        ? window.HTMLTextAreaElement.prototype
-                        : window.HTMLInputElement.prototype;
+                    const prototype =
+                        element.tagName === "TEXTAREA"
+                            ? window.HTMLTextAreaElement.prototype
+                            : window.HTMLInputElement.prototype;
 
-                    const setter = Object.getOwnPropertyDescriptor(
-                        prototype,
-                        "value"
-                    );
+                    const descriptor =
+                        Object.getOwnPropertyDescriptor(
+                            prototype,
+                            "value"
+                        );
 
-                    if (setter && setter.set) {
-                        setter.set.call(element, "");
+                    if (descriptor && descriptor.set) {
+                        descriptor.set.call(element, "");
                     } else {
                         element.value = "";
                     }
 
                     element.dispatchEvent(
-                        new Event("input", { bubbles: true })
+                        new Event("input", {
+                            bubbles: true
+                        })
                     );
+
                     element.dispatchEvent(
-                        new Event("change", { bubbles: true })
+                        new Event("change", {
+                            bubbles: true
+                        })
                     );
                 }
             } catch (error) {
@@ -995,25 +1147,37 @@
         });
     }
 
-    window.addEventListener("keydown", function (event) {
-        if (
-            (event.ctrlKey || event.metaKey) &&
-            event.key.toLowerCase() === "r"
-        ) {
-            try {
-                sessionStorage.setItem(RELOAD_SEARCH_KEY, "1");
-            } catch (_) {}
-        }
-    }, true);
+    // Ctrl+R e Cmd+R su Mac.
+    window.addEventListener(
+        "keydown",
+        function (event) {
+            if (
+                (event.ctrlKey || event.metaKey) &&
+                event.key.toLowerCase() === "r"
+            ) {
+                try {
+                    sessionStorage.setItem(
+                        RELOAD_SEARCH_KEY,
+                        "1"
+                    );
+                } catch (_) {}
+            }
+        },
+        true
+    );
 
     let shouldClearSearch = false;
 
     try {
         shouldClearSearch =
-            sessionStorage.getItem(RELOAD_SEARCH_KEY) === "1";
+            sessionStorage.getItem(
+                RELOAD_SEARCH_KEY
+            ) === "1";
 
         if (shouldClearSearch) {
-            sessionStorage.removeItem(RELOAD_SEARCH_KEY);
+            sessionStorage.removeItem(
+                RELOAD_SEARCH_KEY
+            );
         }
     } catch (_) {}
 
@@ -1026,7 +1190,10 @@
             attempts++;
 
             if (attempts < maxAttempts) {
-                window.setTimeout(tryClearSearch, 250);
+                window.setTimeout(
+                    tryClearSearch,
+                    250
+                );
             }
         }
 
@@ -1043,7 +1210,8 @@
 
     console.info(
         "[MendelSimulator " + VERSION + "] Caricato.",
-        "Ibridi registrati:",
-        Object.keys(hybrids).length
+        "Ibridi salvati:",
+        Object.keys(hybrids).length,
+        "Ripristino automatico disattivato."
     );
 })();
