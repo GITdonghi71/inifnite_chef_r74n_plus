@@ -2,7 +2,7 @@
 /*
  * Barbie Dream World
  * Mod per Infinite Chef - R74n
- * 30 ingredienti con forme standard
+ * 30 ingredienti, solo forme geometriche standard
  */
 
 addIngredient("barbie_dreamhouse", {
@@ -15,7 +15,7 @@ addIngredient("barbie_dreamhouse", {
 addIngredient("barbie_glitter", {
     color: "#FFB6E6",
     type: "material",
-    shape: "sparkle",
+    shape: "star",
     keywords: "barbie glitter sparkle pink shiny"
 });
 
@@ -28,7 +28,6 @@ addIngredient("barbie_dream_car", {
 
 addIngredient("barbie_diamond_purse", {
     color: "#FF69B4",
-    innerColor: "#E6E6FA",
     type: "accessory",
     shape: "diamond",
     keywords: "barbie diamond purse handbag pink fashion"
@@ -43,7 +42,6 @@ addIngredient("barbie_magic_wand", {
 
 addIngredient("barbie_royal_crown", {
     color: "#FFD700",
-    innerColor: "#FF69B4",
     type: "jewelry",
     shape: "triangle",
     keywords: "barbie royal crown princess queen gold"
@@ -51,7 +49,6 @@ addIngredient("barbie_royal_crown", {
 
 addIngredient("barbie_dream_dress", {
     color: "#FF69B4",
-    innerColor: "#FFB6C1",
     type: "clothing",
     shape: "triangle",
     keywords: "barbie dream dress pink fashion gown"
@@ -66,24 +63,22 @@ addIngredient("barbie_high_heels", {
 
 addIngredient("barbie_glam_sunglasses", {
     color: "#FF69B4",
-    innerColor: "#4B164C",
     type: "accessory",
-    shape: "rectangle",
+    shape: "square",
     keywords: "barbie glam sunglasses pink fashion"
 });
 
 addIngredient("barbie_pink_lipstick", {
     color: "#FF1493",
     type: "cosmetic",
-    shape: "cylinder",
+    shape: "rectangle",
     keywords: "barbie pink lipstick makeup beauty"
 });
 
 addIngredient("barbie_dream_perfume", {
     color: "#FFB6E6",
-    innerColor: "#FF69B4",
     type: "cosmetic",
-    shape: "bottle",
+    shape: "circle",
     keywords: "barbie dream perfume fragrance pink"
 });
 
@@ -97,7 +92,6 @@ addIngredient("barbie_heart_gem", {
 
 addIngredient("barbie_dream_unicorn", {
     color: "#DDA0DD",
-    innerColor: "#FF69B4",
     type: "animal",
     shape: "star",
     keywords: "barbie dream unicorn magical pink fantasy"
@@ -106,7 +100,7 @@ addIngredient("barbie_dream_unicorn", {
 addIngredient("barbie_pink_bow", {
     color: "#FF69B4",
     type: "accessory",
-    shape: "bow",
+    shape: "heart",
     keywords: "barbie pink bow ribbon cute fashion"
 });
 
@@ -120,15 +114,13 @@ addIngredient("barbie_pink_cupcake", {
 
 addIngredient("barbie_strawberry_smoothie", {
     color: "#FF4F81",
-    innerColor: "#FFB6C1",
     type: "liquid",
-    shape: "drop",
+    shape: "circle",
     keywords: "barbie strawberry smoothie pink drink fruit"
 });
 
 addIngredient("barbie_cotton_candy", {
     color: "#FFB6E6",
-    innerColor: "#DDA0DD",
     type: "candy",
     shape: "cloud",
     keywords: "barbie cotton candy pink sugar sweet"
@@ -138,28 +130,26 @@ addIngredient("barbie_rose_bouquet", {
     color: "#FF69B4",
     innerColor: "#228B22",
     type: "flower",
-    shape: "flower",
+    shape: "circle",
     keywords: "barbie rose bouquet pink flowers"
 });
 
 addIngredient("barbie_dream_star", {
     color: "#FFD700",
-    innerColor: "#FF69B4",
     type: "magic",
     shape: "star",
     keywords: "barbie dream star sparkle magic"
 });
 
 addIngredient("barbie_rainbow", {
-    color: "#FF69B4",
+    color: ["#FF69B4", "#DA70D6", "#87CEFA"],
     type: "magic",
-    shape: "rainbow",
+    shape: "triangle",
     keywords: "barbie rainbow colorful pink fantasy"
 });
 
 addIngredient("barbie_glam_poodle", {
     color: "#FFB6E6",
-    innerColor: "#FF69B4",
     type: "animal",
     shape: "circle",
     keywords: "barbie glam poodle pink dog pet"
@@ -167,31 +157,28 @@ addIngredient("barbie_glam_poodle", {
 
 addIngredient("barbie_pink_bicycle", {
     color: "#FF1493",
-    innerColor: "#FFB6C1",
     type: "vehicle",
     shape: "circle",
     keywords: "barbie pink bicycle bike ride"
 });
 
 addIngredient("barbie_beach_paradise", {
-    color: "#FFB6E6",
-    innerColor: "#40E0D0",
+    color: "#40E0D0",
+    innerColor: "#FFB6E6",
     type: "place",
-    shape: "wave",
+    shape: "circle",
     keywords: "barbie beach paradise pink tropical summer"
 });
 
 addIngredient("barbie_dream_surfboard", {
     color: "#FF69B4",
-    innerColor: "#00CED1",
     type: "sport",
-    shape: "oval",
+    shape: "triangle",
     keywords: "barbie dream surfboard pink surfing ocean"
 });
 
 addIngredient("barbie_selfie_camera", {
     color: "#FF69B4",
-    innerColor: "#E6E6FA",
     type: "technology",
     shape: "square",
     keywords: "barbie selfie camera pink photo"
@@ -199,23 +186,20 @@ addIngredient("barbie_selfie_camera", {
 
 addIngredient("barbie_pop_microphone", {
     color: "#DA70D6",
-    innerColor: "#FFD700",
     type: "music",
-    shape: "cylinder",
+    shape: "circle",
     keywords: "barbie pop star microphone pink singing music"
 });
 
 addIngredient("barbie_ballet_slippers", {
     color: "#FFB6C1",
-    innerColor: "#FF69B4",
     type: "clothing",
-    shape: "oval",
+    shape: "triangle",
     keywords: "barbie ballet slippers pink dance ballerina"
 });
 
 addIngredient("barbie_magic_mirror", {
     color: "#FF69B4",
-    innerColor: "#E6E6FA",
     type: "magic",
     shape: "circle",
     keywords: "barbie magic mirror pink beauty princess"
