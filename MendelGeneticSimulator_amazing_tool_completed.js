@@ -3,9 +3,12 @@
  * MendelSimulator.js
  * Infinite Chef R74n Plus
  *
- * Versione 2.1 - genetica procedurale
+ * Versione 2.2 - genetica procedurale
  *
  * MODIFICHE:
+ * - Database ampliato dei nomi degli ibridi.
+ * - Nomi distintivi per ogni livello di rarità.
+ * - Nomi deterministici: stessa coppia = stesso nome.
  * - Gli ibridi delle sessioni precedenti non vengono
  *   aggiunti automaticamente alla barra ingredienti.
  * - Gli incroci scoperti rimangono salvati in localStorage.
@@ -23,7 +26,7 @@
 (function () {
     "use strict";
 
-    const VERSION = "2.1";
+    const VERSION = "2.2";
     const TOOL_ID = "mendel_simulator";
     const STORAGE_KEY = "mendel_simulator_hybrids_v1";
     const RELOAD_SEARCH_KEY = "mendel_clear_search_after_reload";
@@ -54,8 +57,11 @@
             const raw = localStorage.getItem(STORAGE_KEY);
             const data = raw ? JSON.parse(raw) : {};
 
-            return data && typeof data === "object" &&
-                !Array.isArray(data) ? data : {};
+            return data &&
+                typeof data === "object" &&
+                !Array.isArray(data)
+                ? data
+                : {};
         } catch (error) {
             console.warn(
                 "[MendelSimulator] Storage non leggibile.",
@@ -179,7 +185,6 @@
         id = normalizeId(id);
         if (!id) return null;
 
-        // Ingredienti originali e microorganismi già registrati.
         if (registry.microorganisms[id]) {
             return registry.microorganisms[id];
         }
@@ -566,8 +571,123 @@
     }
 
     // ---------------------------------------------------------
-    // NOMI E DESCRIZIONI
+    // DATABASE DEI NOMI DEGLI IBRIDI
     // ---------------------------------------------------------
+
+    const HYBRID_NAME_DATABASE = {
+        "Comune": [
+            "Micron", "Biomix", "Sporex", "Cellion",
+            "Nexospora", "Microgen", "Floraxis", "Zymora",
+            "Biovex", "Morfyx", "Cultivar", "Vireon",
+            "Mycora", "Protoflux", "Cellaris", "Novaspora",
+            "Genomix", "Microbloom", "Biocore", "Nexocyte",
+            "Floromorph", "Zymogen", "Sporeling", "Celloflux"
+        ],
+
+        "Non comune": [
+            "Cryomorph", "Lumaspora", "Aethercell", "Prismora",
+            "Chronospore", "Velocryx", "Nexaflora", "Umbryon",
+            "Terramorph", "Aquavex", "Sylvaris", "Vitrazyme",
+            "Solaris Bloom", "Ferrospora", "Nebulume", "Echoflora",
+            "Moonspore", "Aetherbloom", "Crystalis", "Frostpetal",
+            "Verdantix", "Glacivex", "Mistweaver", "Starblossom"
+        ],
+
+        "Raro": [
+            "Dracoryx", "Stormfang", "Frostveil", "Venomspire",
+            "Shadowbloom", "Ironclaw", "Pyrothorn", "Moonfang",
+            "Thornveil", "Aetherfang", "Runebloom", "Tempestrix",
+            "Nightscale", "Emberwing", "Crystalmaw", "Duskwyrm",
+            "Bloodthorn", "Starfang", "Voidpetal", "Thunderbloom",
+            "Ashenclaw", "Silverwyrm", "Duskreaver", "Riftstalker",
+            "Venomwing", "Cinderfang", "Moonshatter", "Gloomthorn",
+            "Wildstar", "Feralith", "Stormbloom", "Obsidian Fang"
+        ],
+
+        "Epico": [
+            "Astragon", "Infernyx", "Dreadwing", "Titanwyrm",
+            "Eclipsion", "Voidmaw", "Stormreaver", "Arcanthos",
+            "Soulrender", "Chronodrake", "Oblivionis", "Magnoryx",
+            "Starcrusher", "Tempestrion", "Nightbringer", "Eldravox",
+            "Abyssion", "Runebreaker", "Galacthyr", "Doomscale",
+            "Celesthorn", "Pyrothar", "Cryomortis", "Umbraxis",
+            "Voidfang", "Astral Reaver", "Netherclaw", "Dreadnexus",
+            "Solarbane", "Eternyx", "Rift Emperor", "Aetherstorm",
+            "Darkstar Colossus", "Tempest King", "Oblivarach",
+            "Cosmic Ravager", "Infernal Sovereign", "Storm Tyrant"
+        ],
+
+        "Leggendario": [
+            "Chimera", "Fenrir", "Leviatano", "Grifone Primordiale",
+            "Basilisco Supremo", "Idra Eterna", "Cerbero Immortale",
+            "Kraken Abissale", "Manticora Reale", "Drago Apocalittico",
+            "Fenice Eterna", "Jormungandr", "Tiamat", "Fafnir",
+            "Nidhogg", "Quetzalcoatl", "Behemoth", "Typhon",
+            "Serpente del Giudizio", "Colosso Celeste",
+            "Re del Vuoto", "Divoratore di Stelle",
+            "Sovrano delle Tempeste", "Chimera dell'Eclissi",
+            "Leviatano Primordiale", "Grifone Astrale",
+            "Dracochimera", "Fenrir Cremisi", "Idra del Caos",
+            "Guardiano dell'Eternità", "Titano delle Ere",
+            "Imperatore Abissale", "Mietitore Cosmico",
+            "Drago delle Mille Forme", "Arconte Supremo",
+            "Fenice del Giudizio", "Basilisco delle Ere",
+            "Kraken delle Stelle", "Cerbero dell'Apocalisse",
+            "Manticora dell'Infinito", "Colosso del Caos",
+            "Serafino Primordiale", "Leviatano Cremisi",
+            "Drago del Crepuscolo Eterno", "Re delle Dimensioni",
+            "Chimera Astrale", "Fenrir Divino", "Hydra Rex",
+            "Grifone del Sole Nero", "Titano dell'Abisso",
+            "Signore delle Mille Tempeste", "Custode del Cosmo",
+            "Distruttore di Mondi", "Drago della Genesi",
+            "Erede del Vuoto", "Sovrano dell'Eclissi",
+            "Bestia dell'Ultimo Giorno", "L'Immortale"
+        ],
+
+        "Mitico": [
+            "Primordius", "Genesis Rex", "Omega Primordial",
+            "Aetherion", "Omnidragon", "Eternamortis",
+            "Chaos Incarnate", "The First Beast",
+            "World Eater", "Void Emperor", "The Unmaker",
+            "Cosmoryx", "Infinite Maw", "Eclipse Sovereign",
+            "Godslayer", "Eonbreaker", "Astral Devourer",
+            "The Final Evolution", "Singularity Beast",
+            "Eternal Paradox", "The Nameless One",
+            "Apex of Creation", "Multiversal Tyrant",
+            "Origin Devourer", "Genesis Overlord",
+            "The Endbringer", "Omniseraph", "Empyreon",
+            "Celestheon", "Abyssaroth", "The Hollow King",
+            "Cosmic Singularity", "Universe Eater",
+            "Absolute Genesis", "Eternal Sovereign",
+            "The Last Hybrid", "Omega Chimera",
+            "Apex Infinity", "God of All Forms",
+            "The Infinite One", "Worldbreaker Prime",
+            "Eternity Devourer", "Origin of Chaos",
+            "The Absolute One", "Omniversal Rex",
+            "Primordial Infinity", "Aether Genesis",
+            "The Unwritten God", "Endless Singularity",
+            "Creator of Worlds", "The Final Constant",
+            "Void Beyond Time", "Eternal Genesis",
+            "Allfather Chimera", "Omega Leviathan",
+            "The Last Archetype", "Origin Eternal",
+            "Cosmic Absolute", "Infinite Sovereign",
+            "The First and Last", "Apex of Eternity",
+            "The Unmaking Force", "Beyond Creation",
+            "Omnithar", "Eternox", "Genesis of All",
+            "The Infinite Apex", "Finality Prime",
+            "The Everlasting", "Absolute Paradox",
+            "The One Beyond", "Primordial Emperor"
+        ]
+    };
+
+    const HYBRID_NAME_FALLBACK = [
+        "Aetherion",
+        "Drakoryx",
+        "Astragon",
+        "Primordius",
+        "Eclipsion",
+        "Omnidragon"
+    ];
 
     function generateName(
         parentA,
@@ -575,30 +695,23 @@
         rarity,
         key
     ) {
-        const prefixes = [
-            "Neo", "Xeno", "Astra", "Vitra", "Cryo",
-            "Luma", "Umbra", "Aero", "Myco", "Bio",
-            "Quantum", "Prisma", "Nexa", "Chrono", "Evo"
-        ];
+        const pool =
+            HYBRID_NAME_DATABASE[rarity] &&
+            HYBRID_NAME_DATABASE[rarity].length
+                ? HYBRID_NAME_DATABASE[rarity]
+                : HYBRID_NAME_FALLBACK;
 
-        const suffixes = [
-            "gen", "morph", "spora", "cyte", "flux",
-            "nex", "vore", "lume", "form", "zyme",
-            "core", "strain", "pulse", "bloom", "veil"
-        ];
-
-        const prefix = choose(
-            prefixes,
-            key + "|name-prefix"
+        const name = choose(
+            pool,
+            key + "|legendary-name|" + rarity
         );
 
-        const suffix = choose(
-            suffixes,
-            key + "|name-suffix"
-        );
-
-        return prefix + suffix + " [" + rarity + "]";
+        return name + " [" + rarity + "]";
     }
+
+    // ---------------------------------------------------------
+    // DESCRIZIONI
+    // ---------------------------------------------------------
 
     function generateDescription(
         parentA,
@@ -708,8 +821,7 @@
 
         const key = combinationKey(ids[0], ids[1]);
 
-        // Un incrocio già scoperto non viene registrato di nuovo.
-        // IMPORTANTE: non usare restoreHybrid() qui.
+        // Non ripristinare ingredienti delle sessioni precedenti.
         if (hybrids[key]) {
             window.alert(
                 "Incrocio già scoperto!\n\n" +
@@ -848,8 +960,8 @@
             createdAt: Date.now()
         };
 
-        // Memorizza il risultato senza ripristinare automaticamente
-        // gli ibridi salvati durante le sessioni precedenti.
+        // Memorizza il risultato senza ripristinare gli ibridi
+        // salvati durante le sessioni precedenti.
         hybrids[key] = hybrid;
 
         const saved = saveHybrids();
@@ -872,7 +984,6 @@
             return null;
         }
 
-        // Disponibile nel registro durante la sessione corrente.
         registry.microorganisms[hybrid.id] = hybrid;
 
         try {
@@ -979,14 +1090,13 @@
     });
 
     // ---------------------------------------------------------
-    // NESSUN RIPRISTINO AUTOMATICO DEGLI IBRIDI PRECEDENTI
-    //
-    // Non chiamare restoreHybrid() al caricamento.
-    // Questo evita che la mod reinserisca gli ibridi salvati
-    // nella barra degli ingredienti dopo Ctrl+R.
-    //
-    // Il registro persistente resta disponibile tramite le API.
+    // NESSUN RIPRISTINO AUTOMATICO
     // ---------------------------------------------------------
+
+    // Gli ibridi salvati non vengono reinseriti automaticamente
+    // nel registro degli ingredienti al caricamento della mod.
+    // Non chiamare restoreHybrid() o addHybridIngredient()
+    // per gli elementi già presenti in localStorage.
 
     // ---------------------------------------------------------
     // API PUBBLICA
@@ -1041,7 +1151,6 @@
                 });
         },
 
-        // Cancella tutti i dati salvati dalla mod.
         clearHybrids: function () {
             hybrids = {};
 
@@ -1108,6 +1217,11 @@
             try {
                 if (element.isContentEditable) {
                     element.textContent = "";
+                    element.dispatchEvent(
+                        new Event("input", {
+                            bubbles: true
+                        })
+                    );
                 } else {
                     const prototype =
                         element.tagName === "TEXTAREA"
