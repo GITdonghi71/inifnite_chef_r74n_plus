@@ -9,18 +9,17 @@
  * - 6 piatti per concorrente a ogni manche
  * - 1 eliminazione nelle prime 3 manche
  * - Finale tra i 2 concorrenti rimasti
+ * - Difficoltà aumentata e progressiva
+ * - Nomi casuali dei concorrenti a ogni nuovo torneo
  *
  * Dipendenza: restoration_sim.js caricato nella stessa pagina.
  *
- * IMPORTANTE:
- * I concorrenti virtuali usano esclusivamente piatti acquisiti nei
- * 6 slot di Restoration Simulator. Gli ID degli ingredienti non vengono
- * filtrati per nome, tipo o provenienza: sono conservati anche quelli
- * derivati e aggiunti da altre mod.
+ * I concorrenti virtuali utilizzano esclusivamente piatti acquisiti
+ * nei 6 slot di Restoration Simulator.
  *
- * Questo modulo non inventa ricette e non modifica i piatti salvati.
- * I punteggi virtuali sono simulazioni d'intrattenimento, non risultati
- * ufficiali o profitti reali.
+ * Nessuna ricetta o ingrediente viene inventato.
+ * Nessun piatto salvato viene modificato.
+ * I punteggi e i profitti virtuali sono simulazioni d'intrattenimento.
  */
 
 (() => {
@@ -30,16 +29,68 @@
   const SAVE_KEY = "masterchefSimulatorSave_v2";
   const RESTORATION_ID = "restoration-simulator-v3";
 
+  // Difficoltà: modificabili per personalizzare il torneo.
+  const DIFFICULTY = {
+    minSkill: 0.45,
+    maxSkill: 0.95,
+    dishRandomness: 0.15,
+    skillMultiplier: 1.0,
+    roundBonus: 0.12,
+    minVirtualProfit: 900,
+    maxVirtualProfit: 2200
+  };
+
   if (window[MOD_ID]?.destroy) {
     window[MOD_ID].destroy();
   }
 
-  const CHEFS = [
-    { id: "player", name: "Tu", human: true, skill: 0 },
-    { id: "chef_amelia", name: "Amelia Rossi", skill: 0.18 },
-    { id: "chef_marco", name: "Marco Bellini", skill: 0.08 },
-    { id: "chef_sofia", name: "Sofia Moretti", skill: 0.14 },
-    { id: "chef_luca", name: "Luca Ferri", skill: 0.04 }
+  // ------------------------------------------------------------
+  // Nomi dei concorrenti
+  // ------------------------------------------------------------
+
+  const PLAYER_CHEF = {
+    id: "player",
+    name: "Tu",
+    human: true,
+    skill: 0
+  };
+
+  const FIRST_NAMES = [
+    "Alessandro", "Beatrice", "Camilla", "Daniele",
+    "Elena", "Federico", "Giulia", "Gabriele",
+    "Isabella", "Leonardo", "Matteo", "Nicole",
+    "Riccardo", "Aurora", "Tommaso", "Vittoria",
+    "Edoardo", "Francesca", "Lorenzo", "Martina",
+    "Andrea", "Chiara", "Davide", "Sofia",
+    "Filippo", "Alice", "Marco", "Giorgia",
+    "Samuele", "Emma", "Pietro", "Ludovica",
+    "Cristiano", "Noemi", "Jacopo", "Viola",
+    "Michele", "Arianna", "Simone", "Gaia",
+    "Nathan", "Rebecca", "Christian", "Melissa",
+    "Diego", "Eleonora", "Thomas", "Serena",
+    "Giacomo", "Bianca", "Emanuele", "Irene",
+    "Niccolò", "Marta", "Stefano", "Claudia",
+    "Alberto", "Federica", "Enrico", "Valentina",
+    "Dario", "Lara", "Pietro", "Cecilia"
+  ];
+
+  const LAST_NAMES = [
+    "Rossi", "Bianchi", "Romano", "Colombo",
+    "Ricci", "Marino", "Greco", "Bruno",
+    "Gallo", "Conti", "De Luca", "Costa",
+    "Giordano", "Mancini", "Rizzo", "Lombardi",
+    "Moretti", "Barbieri", "Fontana", "Santoro",
+    "Mariani", "Rinaldi", "Caruso", "Ferrara",
+    "Galli", "Martini", "Leone", "Longo",
+    "Gentile", "Martinelli", "Vitale", "Lombardo",
+    "Serra", "Coppola", "De Santis", "D'Angelo",
+    "Parisi", "Villa", "Ferri", "Pellegrini",
+    "Messina", "Fabbri", "Bianco", "Fiore",
+    "Monti", "Grassi", "Testa", "Amato",
+    "Marchetti", "Riva", "Farina", "Bellini",
+    "Benedetti", "Bernardi", "Rossetti", "Palmieri",
+    "Morelli", "Sartori", "Orlando", "Piras",
+    "Cattaneo", "Ferraro", "Silvestri", "Neri"
   ];
 
   let panel = null;
@@ -51,21 +102,77 @@
   // Stato e salvataggio
   // ------------------------------------------------------------
 
-  function newTournament() {
+  function newTournament(excludedNames = []) {
     return {
       round: 1,
       finished: false,
       winner: null,
       lastProcessedSimulation: null,
       rounds: [],
-      contestants: CHEFS.map(chef => ({
-        ...chef,
+      contestants: generateContestants(excludedNames)
+    };
+  }
+
+  function generateContestants(excludedNames = []) {
+    const usedNames = new Set(excludedNames);
+    const contestants = [{
+      ...PLAYER_CHEF,
+      active: true,
+      totalScore: 0,
+      eliminatedRound: null,
+      history: []
+    }];
+
+    const possibleNames = [];
+
+    for (const firstName of FIRST_NAMES) {
+      for (const lastName of LAST_NAMES) {
+        possibleNames.push(`${firstName} ${lastName}`);
+      }
+    }
+
+    // Mescola i nomi per evitare sequenze prevedibili.
+    for (let i = possibleNames.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [possibleNames[i], possibleNames[j]] =
+        [possibleNames[j], possibleNames[i]];
+    }
+
+    let nameIndex = 0;
+
+    while (contestants.length < 5) {
+      if (nameIndex >= possibleNames.length) {
+        throw new Error(
+          "Non ci sono abbastanza nomi disponibili per il torneo."
+        );
+      }
+
+      const name = possibleNames[nameIndex++];
+      if (usedNames.has(name)) continue;
+
+      usedNames.add(name);
+
+      contestants.push({
+        id: `chef_${contestants.length}_${name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "_")}`,
+        name,
+        human: false,
+
+        // Avversari più forti fin dalla prima manche.
+        skill: randomBetween(
+          DIFFICULTY.minSkill,
+          DIFFICULTY.maxSkill
+        ),
+
         active: true,
         totalScore: 0,
         eliminatedRound: null,
         history: []
-      }))
-    };
+      });
+    }
+
+    return contestants;
   }
 
   function loadState() {
@@ -81,7 +188,10 @@
         return saved;
       }
     } catch (error) {
-      console.warn("[MasterChef] Salvataggio non leggibile.", error);
+      console.warn(
+        "[MasterChef] Salvataggio non leggibile.",
+        error
+      );
     }
 
     return newTournament();
@@ -91,7 +201,10 @@
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(state));
     } catch (error) {
-      console.error("[MasterChef] Errore nel salvataggio.", error);
+      console.error(
+        "[MasterChef] Errore nel salvataggio.",
+        error
+      );
     }
   }
 
@@ -122,7 +235,9 @@
   }
 
   function randomBetween(min, max) {
-    return Math.round((min + Math.random() * (max - min)) * 100) / 100;
+    return Math.round(
+      (min + Math.random() * (max - min)) * 100
+    ) / 100;
   }
 
   function getRestoration() {
@@ -139,14 +254,9 @@
   }
 
   // ------------------------------------------------------------
-  // Ingredienti e piatti reali
+  // Ingredienti e piatti acquisiti
   // ------------------------------------------------------------
 
-  /*
-   * Questa funzione legge il contenuto acquisito da Restoration.
-   * Non confronta gli ID con una lista di ingredienti conosciuti:
-   * ogni ID presente in counts viene conservato.
-   */
   function getDishIngredients(dish) {
     if (!dish || typeof dish !== "object") {
       return [];
@@ -172,14 +282,14 @@
   }
 
   /*
-   * Valutazione indicativa d'intrattenimento basata sulla varietà
-   * e sulla quantità dei componenti del piatto acquisito.
-   *
-   * Non dichiara che una combinazione sia una ricetta valida:
-   * il piatto deve essere già presente in Restoration Simulator.
+   * Valutazione indicativa d'intrattenimento.
+   * Non viene verificata né inventata alcuna ricetta.
    */
   function scoreDish(dish) {
-    const items = Array.isArray(dish?.items) ? dish.items : [];
+    const items = Array.isArray(dish?.items)
+      ? dish.items
+      : [];
+
     const ingredients = getDishIngredients(dish);
     const variety = ingredients.length;
     const quantity = items.length;
@@ -234,9 +344,10 @@
       )
     ) {
       throw new Error(
-        "Per svolgere una manche servono 6 piatti validi nei sei slot " +
-        "di Restoration Simulator. Acquisisci i piatti e controlla che " +
-        "ciascuno contenga ingredienti."
+        "Per svolgere una manche servono 6 piatti validi " +
+        "nei sei slot di Restoration Simulator. " +
+        "Acquisisci i piatti e controlla che ciascuno " +
+        "contenga ingredienti."
       );
     }
 
@@ -246,8 +357,10 @@
   function averageRecipeScore(slots) {
     const ratings = slots.map(scoreDish);
 
-    return ratings.reduce((sum, score) => sum + score, 0) /
-      ratings.length;
+    return ratings.reduce(
+      (sum, score) => sum + score,
+      0
+    ) / ratings.length;
   }
 
   // ------------------------------------------------------------
@@ -265,8 +378,8 @@
     ) {
       throw new Error(
         "Non trovo una nuova simulazione di Restoration Simulator. " +
-        "Completa i sei piatti e premi «Simula il ristorante» prima " +
-        "di registrare la manche."
+        "Completa i sei piatti e premi «Simula il ristorante» " +
+        "prima di registrare la manche."
       );
     }
 
@@ -275,7 +388,12 @@
     const capital = Number(restorationState.capital) || 0;
 
     const qualityPoints = (average / 5) * 65;
-    const economyPoints = clamp(15 + profit / 1000 * 15, 0, 35);
+
+    const economyPoints = clamp(
+      15 + profit / 1000 * 15,
+      0,
+      35
+    );
 
     const score = Math.round(
       clamp(qualityPoints + economyPoints, 0, 100) * 100
@@ -298,18 +416,15 @@
   }
 
   // ------------------------------------------------------------
-  // Concorrenti virtuali
+  // Concorrenti virtuali: menu e difficoltà
   // ------------------------------------------------------------
 
   /*
-   * I menu virtuali sono costruiti scegliendo tra i sei piatti reali
+   * I menu virtuali sono creati selezionando i sei piatti
    * acquisiti in Restoration Simulator.
    *
-   * Non vengono creati nomi di ricette inventati, ingredienti fittizi
-   * o combinazioni arbitrarie di ID.
-   *
-   * Un piatto può essere selezionato più di una volta: ogni concorrente
-   * simula il proprio menu usando i piatti disponibili.
+   * Nessun ingrediente o piatto viene inventato.
+   * Un piatto può essere scelto più volte.
    */
   function virtualMenu(restorationState, chef) {
     const slots = validateRestorationSlots(restorationState);
@@ -319,7 +434,7 @@
       const index = Math.floor(Math.random() * slots.length);
       const source = slots[index];
 
-      // Copia i dati usati dal simulatore; non modifica lo stato originale.
+      // Copia indipendente: lo stato originale non viene modificato.
       const copiedDish = {
         name: dishDisplayName(source, index),
         items: source.items.map(item => ({ ...item })),
@@ -327,8 +442,17 @@
       };
 
       const baseRating = scoreDish(copiedDish);
+
+      const skillBonus =
+        chef.skill * DIFFICULTY.skillMultiplier;
+
       const rating = clamp(
-        baseRating + chef.skill + randomBetween(-0.25, 0.25),
+        baseRating +
+        skillBonus +
+        randomBetween(
+          -DIFFICULTY.dishRandomness,
+          DIFFICULTY.dishRandomness
+        ),
         1,
         5
       );
@@ -352,21 +476,52 @@
     ) / dishes.length;
 
     /*
-     * Economia virtuale: è solo un valore simulato per il torneo.
-     * Non viene scritto in Restoration Simulator e non ne modifica
-     * il capitale, lo storico o le simulazioni.
+     * Bonus progressivo:
+     * Manche 1: +0.00
+     * Manche 2: +0.12
+     * Manche 3: +0.24
+     * Finale:   +0.36
+     *
+     * Il bonus influenza il punteggio virtuale, non i piatti.
      */
-    const profit = Math.round(randomBetween(250, 1800));
+    const roundBonus =
+      (state.round - 1) * DIFFICULTY.roundBonus;
+
+    const adjustedAverage = clamp(
+      average + roundBonus,
+      1,
+      5
+    );
+
+    /*
+     * Economia virtuale competitiva.
+     * Non modifica il capitale di Restoration Simulator.
+     */
+    const profit = Math.round(
+      randomBetween(
+        DIFFICULTY.minVirtualProfit,
+        DIFFICULTY.maxVirtualProfit
+      )
+    );
+
     const capital = 1000 + profit;
-    const economyPoints = clamp(15 + profit / 1000 * 15, 0, 35);
+
+    const economyPoints = clamp(
+      15 + profit / 1000 * 15,
+      0,
+      35
+    );
+
+    const qualityPoints = (adjustedAverage / 5) * 65;
 
     const score = Math.round(
-      clamp((average / 5) * 65 + economyPoints, 0, 100) * 100
+      clamp(qualityPoints + economyPoints, 0, 100) * 100
     ) / 100;
 
     return {
       score,
-      averageRating: Math.round(average * 100) / 100,
+      averageRating:
+        Math.round(adjustedAverage * 100) / 100,
       profit,
       capital,
       dishes
@@ -380,7 +535,8 @@
   function registerRound() {
     if (state.finished) {
       alert(
-        "Il torneo è già terminato. Avvia un nuovo torneo per ricominciare."
+        "Il torneo è già terminato. " +
+        "Avvia un nuovo torneo per ricominciare."
       );
       return;
     }
@@ -401,12 +557,13 @@
     let playerResult = null;
 
     /*
-     * Se è ancora in gara, il giocatore deve avere una nuova
+     * Se il giocatore è ancora in gara, serve una nuova
      * simulazione Restoration per ogni manche.
      *
-     * I virtual chef usano invece i sei piatti già acquisiti.
+     * Se il giocatore è eliminato, il torneo continua con
+     * gli avversari virtuali usando i sei piatti acquisiti.
      */
-    if ((player?.active) || activeVirtuals) {
+    if (player?.active || activeVirtuals) {
       try {
         restorationState = getRestoration();
 
@@ -457,7 +614,8 @@
     }
 
     if (playerResult) {
-      state.lastProcessedSimulation = playerResult.simulationDate;
+      state.lastProcessedSimulation =
+        playerResult.simulationDate;
     }
 
     results.sort((a, b) => b.totalScore - a.totalScore);
@@ -470,19 +628,20 @@
         .filter(chef => chef.active)
         .sort((a, b) => a.totalScore - b.totalScore);
 
-      // Elimina un concorrente nelle prime tre manche.
+      // Una eliminazione nelle prime tre manche.
       if (active.length > 2) {
         eliminated = active[0];
         eliminated.active = false;
         eliminated.eliminatedRound = roundNumber;
       }
     } else {
-      // La quarta manche è la finale tra i due rimasti.
+      // Finale tra i due concorrenti rimasti.
       const finalists = state.contestants
         .filter(chef => chef.active)
         .sort((a, b) => b.totalScore - a.totalScore);
 
       winner = finalists[0] || null;
+
       state.finished = true;
       state.winner = winner?.id || null;
     }
@@ -491,10 +650,16 @@
       round: roundNumber,
       results,
       eliminated: eliminated
-        ? { id: eliminated.id, name: eliminated.name }
+        ? {
+            id: eliminated.id,
+            name: eliminated.name
+          }
         : null,
       winner: winner
-        ? { id: winner.id, name: winner.name }
+        ? {
+            id: winner.id,
+            name: winner.name
+          }
         : null,
       date: new Date().toISOString()
     });
@@ -532,7 +697,16 @@
       return;
     }
 
-    state = newTournament();
+    /*
+     * Evita di riutilizzare i nomi degli avversari del torneo
+     * appena concluso o cancellato.
+     */
+    const previousNames = state.contestants
+      .filter(chef => !chef.human)
+      .map(chef => chef.name);
+
+    state = newTournament(previousNames);
+
     saveState();
     render();
   }
@@ -548,7 +722,9 @@
       .filter(chef => chef.active)
       .sort((a, b) => b.totalScore - a.totalScore);
 
-    const lastRound = state.rounds[state.rounds.length - 1];
+    const lastRound =
+      state.rounds[state.rounds.length - 1];
+
     const player = state.contestants.find(
       chef => chef.id === "player"
     );
@@ -560,33 +736,51 @@
     panel.innerHTML = `
       <header class="mc-header">
         <div>
-          <div class="mc-kicker">INFINITE CHEF · R74N PLUS</div>
+          <div class="mc-kicker">
+            INFINITE CHEF · R74N PLUS
+          </div>
           <h2>MasterChef Simulator</h2>
           <p>Torneo culinario virtuale</p>
+          <span class="mc-difficulty">
+            ⚔ DIFFICOLTÀ ELEVATA
+          </span>
         </div>
-        <button class="mc-close" data-action="close"
-          title="Chiudi pannello" aria-label="Chiudi pannello">×</button>
+
+        <button class="mc-close"
+          data-action="close"
+          title="Chiudi pannello"
+          aria-label="Chiudi pannello">×</button>
       </header>
 
       <section class="mc-card mc-round">
         <div class="mc-label">STATO DEL TORNEO</div>
+
         <strong>
           ${state.finished
             ? "TORNEO CONCLUSO"
             : `MANCHE ${state.round} / 4`}
         </strong>
+
         <p>
           ${state.finished
             ? "Il vincitore è stato decretato."
             : "Ogni manche rappresenta tre giornate e sei piatti."}
         </p>
+
         <div class="mc-progress">
           <div style="width:${
-            state.finished ? 100 : ((state.round - 1) / 4) * 100
+            state.finished
+              ? 100
+              : ((state.round - 1) / 4) * 100
           }%"></div>
         </div>
+
         <p class="mc-muted">
           Concorrenti in gara: ${active.length} su 5
+        </p>
+
+        <p class="mc-muted">
+          Avversari potenziati e bonus progressivo.
         </p>
       </section>
 
@@ -603,6 +797,7 @@
 
       <section class="mc-section">
         <h3>Classifica attuale</h3>
+
         ${state.contestants
           .slice()
           .sort((a, b) => b.totalScore - a.totalScore)
@@ -611,14 +806,20 @@
               chef.active ? "" : "mc-eliminated"
             }">
               <div class="mc-rank">${index + 1}</div>
+
               <div class="mc-chef-info">
                 <strong>${escapeHTML(chef.name)}</strong>
                 <span>
                   ${chef.active
-                    ? "In gara"
+                    ? (
+                        chef.human
+                          ? "Tu · In gara"
+                          : "Avversario potenziato · In gara"
+                      )
                     : `Eliminato alla manche ${chef.eliminatedRound}`}
                 </span>
               </div>
+
               <div class="mc-points">
                 ${chef.totalScore.toFixed(2)}
               </div>
@@ -628,16 +829,23 @@
 
       <section class="mc-section">
         <h3>Ultima manche</h3>
+
         ${lastRound ? `
-          <p class="mc-muted">Manche ${lastRound.round}</p>
+          <p class="mc-muted">
+            Manche ${lastRound.round}
+          </p>
+
           ${lastRound.results
             .slice()
             .sort((a, b) => b.score - a.score)
             .map((result, index) => `
               <div class="mc-result">
-                <span>${index + 1}. ${escapeHTML(result.name)}</span>
+                <span>
+                  ${index + 1}. ${escapeHTML(result.name)}
+                </span>
                 <strong>${result.score.toFixed(2)} pt</strong>
               </div>
+
               ${result.id === "player" ? `
                 <div class="mc-details">
                   Media dei sei piatti:
@@ -654,17 +862,21 @@
 
           ${lastRound.eliminated ? `
             <p class="mc-elimination">
-              Eliminato: ${escapeHTML(lastRound.eliminated.name)}
+              Eliminato:
+              ${escapeHTML(lastRound.eliminated.name)}
             </p>
           ` : ""}
 
           ${lastRound.winner ? `
             <p class="mc-champion">
-              🏆 Vincitore: ${escapeHTML(lastRound.winner.name)}
+              🏆 Vincitore:
+              ${escapeHTML(lastRound.winner.name)}
             </p>
           ` : ""}
         ` : `
-          <p class="mc-muted">Nessuna manche ancora registrata.</p>
+          <p class="mc-muted">
+            Nessuna manche ancora registrata.
+          </p>
         `}
       </section>
 
@@ -674,9 +886,10 @@
             ? `Registra manche ${state.round}`
             : `Continua torneo virtuale · Manche ${state.round}`}
         </button>
+
         <p class="mc-hint">
           ${player?.active
-            ? "Prima completa i sei slot e premi «Simula il ristorante» in Restoration Simulator."
+            ? "Completa i sei slot e premi «Simula il ristorante» in Restoration Simulator prima di registrare la manche."
             : "Sei stato eliminato: il torneo continua tra i concorrenti virtuali."}
         </p>
       ` : ""}
@@ -686,9 +899,9 @@
       </button>
 
       <footer class="mc-footer">
-        I concorrenti virtuali usano piatti acquisiti in Restoration
-        Simulator. I loro profitti e punteggi sono simulati e non
-        modificano il capitale reale.
+        I concorrenti virtuali utilizzano esclusivamente piatti
+        acquisiti in Restoration Simulator. I loro profitti e
+        punteggi sono simulati e non modificano il capitale reale.
       </footer>
     `;
   }
@@ -720,13 +933,17 @@
   function mount() {
     if (destroyed) return;
 
-    const existing = document.getElementById(MOD_ID + "-panel");
+    const existing = document.getElementById(
+      MOD_ID + "-panel"
+    );
 
     if (existing) {
       existing.remove();
     }
 
-    const existingStyle = document.getElementById(MOD_ID + "-style");
+    const existingStyle = document.getElementById(
+      MOD_ID + "-style"
+    );
 
     if (existingStyle) {
       existingStyle.remove();
@@ -785,6 +1002,17 @@
         font-size: 10px;
         font-weight: 800;
         letter-spacing: 1px;
+      }
+
+      #${MOD_ID}-panel .mc-difficulty {
+        display: inline-block;
+        margin-top: 7px;
+        padding: 4px 7px;
+        border-radius: 5px;
+        background: #482a3b;
+        color: #ffb6d9;
+        font-size: 10px;
+        font-weight: 800;
       }
 
       #${MOD_ID}-panel .mc-close {
@@ -947,7 +1175,10 @@
 
     panel = document.createElement("aside");
     panel.id = MOD_ID + "-panel";
-    panel.setAttribute("aria-label", "MasterChef Simulator");
+    panel.setAttribute(
+      "aria-label",
+      "MasterChef Simulator"
+    );
 
     document.body.appendChild(panel);
     panel.addEventListener("click", handleClick);
@@ -970,6 +1201,10 @@
     }
   }
 
+  // ------------------------------------------------------------
+  // API pubblica
+  // ------------------------------------------------------------
+
   window[MOD_ID] = {
     getState: () => JSON.parse(JSON.stringify(state)),
     render,
@@ -978,10 +1213,16 @@
   };
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", mount, { once: true });
+    document.addEventListener(
+      "DOMContentLoaded",
+      mount,
+      { once: true }
+    );
   } else {
     mount();
   }
 
-  console.log("[MasterChef Simulator] Caricato.");
+  console.log(
+    "[MasterChef Simulator] Caricato · Difficoltà elevata."
+  );
 })();
