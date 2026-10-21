@@ -149,21 +149,11 @@
 
     // Alcohol è obbligatorio.
     // Riconosce anche nomi comuni di bevande alcoliche.
-    function isAlcohol(id) {
-        const ingredients = getIngredients();
-        const definition = (ingredients && ingredients[id]) || {};
+    
 
-        const text = [
-            id,
-            definition.name,
-            definition.type,
-            definition.category,
-            definition.description
-        ].join(" ").toLowerCase();
-
-        return /\balcohol\b|\balcool\b|\bethanol\b|\bethanolo\b|alcol|vodka|whisky|whiskey|\brum\b|\bron\b|\brhum\b|\bgin\b|brandy|\bwine\b|\bvino\b|\bbeer\b|\bbirra\b|liquor|liqueur|spirits|distillato alcolico/.test(text);
-    }
-
+function isAlcohol(id) {
+    return id === "alcohol";
+}
     // --------------------------------------------------
     // SELEZIONE INGREDIENTI
     // --------------------------------------------------
