@@ -235,6 +235,6 @@ addIngredient("jurassic_amber", {
     color: "#E89B23",
     innerColor: "#FFD166",
     type: "gem",
-    shape: "diamond",
+    shape: "gem",
     keywords: "jurassic park amber prehistoric insect dna fossil"
 });
