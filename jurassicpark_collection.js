@@ -2,7 +2,7 @@
 /*
  * Jurassic Park: Prehistoric World
  * Mod per Infinite Chef - R74n
- * 30 nuovi ingredienti a tema Jurassic Park
+ * 30 ingredienti con forme standard R74n
  */
 
 addIngredient("t_rex_egg", {
