@@ -27,14 +27,6 @@ addIngredient("dinosaur_footprint", {
     keywords: "jurassic park dinosaur footprint track prehistoric"
 });
 
-addIngredient("amber_mosquito", {
-    color: "#E6A12B",
-    innerColor: "#7B4513",
-    type: "fossil",
-    shape: "diamond",
-    keywords: "jurassic park amber mosquito dna insect"
-});
-
 addIngredient("dinosaur_dna", {
     color: "#36B76B",
     innerColor: "#A4F4C5",
@@ -229,12 +221,4 @@ addIngredient("isla_sorna_fossil", {
     type: "fossil",
     shape: "diamond",
     keywords: "jurassic park isla sorna fossil lost world"
-});
-
-addIngredient("jurassic_amber", {
-    color: "#E89B23",
-    innerColor: "#FFD166",
-    type: "gem",
-    shape: "gem",
-    keywords: "jurassic park amber prehistoric insect dna fossil"
 });
